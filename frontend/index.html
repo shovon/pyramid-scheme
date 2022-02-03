@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Video Broadcast</title>
+  </head>
+
+  <body>
+    <script>
+      const ws = new WebSocket("ws://localhost:3030");
+      ws.addEventListener("message", ({ data }) => {
+        console.log(data);
+      });
+    </script>
+  </body>
+</html>
