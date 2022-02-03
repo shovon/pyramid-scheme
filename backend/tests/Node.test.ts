@@ -9,7 +9,7 @@ root.insert(new Node("d", "durian"));
 root.insert(new Node("e", "elderberry"));
 root.insert(new Node("f", "fig"));
 
-const expected = {
+const expected1 = {
   key: "a",
   value: "apple",
   left: {
@@ -41,4 +41,35 @@ const expected = {
   },
 };
 
-assert.deepEqual(JSON.parse(JSON.stringify(root.node)), expected);
+assert.deepEqual(JSON.parse(JSON.stringify(root.node)), expected1);
+
+root.delete("b");
+
+const expected2 = {
+  key: "a",
+  value: "apple",
+  left: {
+    key: "d",
+    value: "durian",
+    left: {
+      key: "e",
+      value: "elderberry",
+      left: null,
+      right: null,
+    },
+    right: null,
+  },
+  right: {
+    key: "c",
+    value: "cherry",
+    left: {
+      key: "f",
+      value: "fig",
+      left: null,
+      right: null,
+    },
+    right: null,
+  },
+};
+
+assert.deepEqual(JSON.parse(JSON.stringify(root.node)), expected2);
