@@ -184,29 +184,6 @@ export default class Node<K, V> implements AbstractNode<K, V> {
     return this.v;
   }
 
-  static bareNode<K, V>(node: AbstractNode<K, V>): AbstractNode<K, V> {
-    return {
-      get key() {
-        return node.key;
-      },
-      get value() {
-        return node.value;
-      },
-      get parent() {
-        return node.parent ? Node.bareNode(node) : null;
-      },
-      get left() {
-        return node.parent ? Node.bareNode(node) : null;
-      },
-      get right() {
-        return node.parent ? Node.bareNode(node) : null;
-      },
-      get children() {
-        return node.children?.map((child) => Node.bareNode(child)) ?? [];
-      },
-    };
-  }
-
   get left() {
     return this._left;
   }
@@ -234,9 +211,32 @@ export default class Node<K, V> implements AbstractNode<K, V> {
     if (this._left) {
       yield* this._left;
     }
-    yield Node.bareNode(this);
+    yield this;
     if (this._right) {
       yield* this._right;
     }
+  }
+
+  static bareNode<K, V>(node: AbstractNode<K, V>): AbstractNode<K, V> {
+    return {
+      get key() {
+        return node.key;
+      },
+      get value() {
+        return node.value;
+      },
+      get parent() {
+        return node.parent ? Node.bareNode(node) : null;
+      },
+      get left() {
+        return node.parent ? Node.bareNode(node) : null;
+      },
+      get right() {
+        return node.parent ? Node.bareNode(node) : null;
+      },
+      get children() {
+        return node.children?.map((child) => Node.bareNode(child)) ?? [];
+      },
+    };
   }
 }

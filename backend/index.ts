@@ -41,6 +41,27 @@ type NodeStateMessage = {
   };
 };
 
+type EssentialNode<K> = {
+  readonly key: K;
+  readonly children: EssentialNode<K>[];
+};
+
+function essentialNode<K, V>(node: AbstractNode<K, V>): EssentialNode<K> {
+  return {
+    get key() {
+      return node.key;
+    },
+    get children() {
+      return node.children.map(essentialNode);
+    },
+  };
+}
+
+type GraphStateMessage = {
+  type: "GRAPH_STATE";
+  data: EssentialNode<ID>;
+};
+
 type RelayedNodeMessage = {
   type: "MESSAGE";
   data: {
@@ -50,7 +71,7 @@ type RelayedNodeMessage = {
   };
 };
 
-type Message = NodeStateMessage;
+type Message = NodeStateMessage | RelayedNodeMessage | GraphStateMessage;
 
 function getNodeMeta(node: AbstractNode<ID, Client>): NodeMeta {
   return {
@@ -58,7 +79,7 @@ function getNodeMeta(node: AbstractNode<ID, Client>): NodeMeta {
   };
 }
 
-function generateNodeStateMessage(
+function createNodeStateMessage(
   node: AbstractNode<ID, Client>
 ): NodeStateMessage {
   return {
@@ -71,12 +92,36 @@ function generateNodeStateMessage(
   };
 }
 
+function createRelayMessage(
+  { from, to }: { from: ID; to: ID },
+  payload: any
+): RelayedNodeMessage {
+  return {
+    type: "MESSAGE",
+    data: {
+      from,
+      to,
+      payload,
+    },
+  };
+}
+
+function createGraphStateMessage(
+  node: AbstractNode<ID, Client>
+): GraphStateMessage {
+  return {
+    type: "GRAPH_STATE",
+    data: essentialNode(node),
+  };
+}
+
 function sendMessage(ws: WebSocket, message: Message) {
   ws.send(JSON.stringify(message));
 }
 
 function sendNodeState(node: AbstractNode<ID, Client>) {
-  sendMessage(node.value, generateNodeStateMessage(node));
+  sendMessage(node.value, createNodeStateMessage(node));
+  sendMessage(node.value, createGraphStateMessage(node));
 }
 
 function broadcastRoomState(broadcast: Tree<ID, Client>) {
@@ -115,10 +160,19 @@ audienceWss.on("connection", (ws, request) => {
         switch (parsed.type) {
           case "MESSAGE":
             {
-              if (parsed.data?.to) {
+              if (!!parsed.data?.to) {
                 const destinationNode = node.adjacentNodes.find(
                   (node) => node.key === parsed.data.to
                 );
+                if (destinationNode) {
+                  sendMessage(
+                    destinationNode.value,
+                    createRelayMessage(
+                      { from: node.key, to: parsed.data.to },
+                      parsed.data.payload
+                    )
+                  );
+                }
               }
             }
             break;
