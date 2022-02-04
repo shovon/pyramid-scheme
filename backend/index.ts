@@ -59,7 +59,7 @@ function essentialNode<K, V>(node: AbstractNode<K, V>): EssentialNode<K> {
 
 type GraphStateMessage = {
   type: "GRAPH_STATE";
-  data: EssentialNode<ID>;
+  data: EssentialNode<ID> | null;
 };
 
 type RelayedNodeMessage = {
@@ -107,7 +107,7 @@ function createRelayMessage(
 }
 
 function createGraphStateMessage(
-  node: AbstractNode<ID, Client>
+  node: AbstractNode<ID, Client> | null
 ): GraphStateMessage {
   return {
     type: "GRAPH_STATE",
@@ -121,7 +121,13 @@ function sendMessage(ws: WebSocket, message: Message) {
 
 function sendNodeState(node: AbstractNode<ID, Client>) {
   sendMessage(node.value, createNodeStateMessage(node));
-  sendMessage(node.value, createGraphStateMessage(node));
+}
+
+function sendGraphState(
+  node: AbstractNode<ID, Client>,
+  tree: Tree<ID, Client>
+) {
+  sendMessage(node.value, createGraphStateMessage(tree.node));
 }
 
 function broadcastRoomState(broadcast: Tree<ID, Client>) {
