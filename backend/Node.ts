@@ -5,18 +5,20 @@ import { EventEmitter } from "events";
  * An abstract node that encapsulate the bare minimum that a node represents.
  * More specifically, it hides away all destructive methods
  */
-export type AbstractNode<K, V> = {
+export interface AbstractNode<K, V> {
   readonly key: K;
   readonly value: V;
+  readonly parent: AbstractNode<K, V> | null;
   readonly left: AbstractNode<K, V> | null;
   readonly right: AbstractNode<K, V> | null;
-};
+  readonly children: AbstractNode<K, V>[];
+}
 
 /**
  * Represents a key/value pairing in a key/value store, represented by an
  * unordered binary tree
  */
-export default class Node<K, V> {
+export default class Node<K, V> implements AbstractNode<K, V> {
   private _left: Node<K, V> | null = null;
   private _right: Node<K, V> | null = null;
   private _parent: Node<K, V> | null = null;
@@ -182,20 +184,25 @@ export default class Node<K, V> {
     return this.v;
   }
 
-  get node(): AbstractNode<K, V> {
-    const that = this;
+  static bareNode<K, V>(node: Node<K, V>): AbstractNode<K, V> {
     return {
       get key() {
-        return that.k;
+        return node.k;
       },
       get value() {
-        return that.value;
+        return node.value;
+      },
+      get parent() {
+        return node.parent ? Node.bareNode(node) : null;
       },
       get left() {
-        return that._left?.node ?? null;
+        return node.parent ? Node.bareNode(node) : null;
       },
       get right() {
-        return that._right?.node ?? null;
+        return node.parent ? Node.bareNode(node) : null;
+      },
+      get children() {
+        return node.children?.map(Node.bareNode);
       },
     };
   }
@@ -208,11 +215,26 @@ export default class Node<K, V> {
     return this._right;
   }
 
+  get children(): AbstractNode<K, V>[] {
+    return [this.left, this.right].filter((v) => !!v) as Node<K, V>[];
+  }
+
+  get parent() {
+    return this._parent;
+  }
+
+  get adjacentNodes(): AbstractNode<K, V>[] {
+    if (this.parent) {
+      return [...this.children, this.parent];
+    }
+    return this.children;
+  }
+
   *[Symbol.iterator](): IterableIterator<AbstractNode<K, V>> {
     if (this._left) {
       yield* this._left;
     }
-    yield this.node;
+    yield Node.bareNode(this);
     if (this._right) {
       yield* this._right;
     }

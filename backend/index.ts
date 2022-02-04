@@ -1,6 +1,6 @@
 import { createServer, Server } from "http";
 import WebSocket, { WebSocketServer } from "ws";
-import Node from "./Node";
+import Node, { AbstractNode } from "./Node";
 import Tree from "./Tree";
 
 const port = 3030;
@@ -14,7 +14,7 @@ type Client = WebSocket;
 
 type ID = string;
 
-const broadcasts = new Map<ID, Tree<ID, Client>>();
+const rooms = new Map<ID, Tree<ID, Client>>();
 
 broadcastWss.on("connection", (ws, request) => {
   if (request.url) {
@@ -28,21 +28,101 @@ function nextId() {
   return (count++).toString();
 }
 
+type NodeMeta = {
+  id: ID;
+};
+
+type NodeStateMessage = {
+  type: "NODE_STATE";
+  data: {
+    selfNode: NodeMeta;
+    parent: NodeMeta | null;
+    children: NodeMeta[];
+  };
+};
+
+type RelayedNodeMessage = {
+  type: "MESSAGE";
+  data: {
+    from: ID;
+    to: ID;
+    payload: any;
+  };
+};
+
+type Message = NodeStateMessage;
+
+function getNodeMeta(node: AbstractNode<ID, Client>): NodeMeta {
+  return {
+    id: node.key,
+  };
+}
+
+function generateNodeStateMessage(
+  node: AbstractNode<ID, Client>
+): NodeStateMessage {
+  return {
+    type: "NODE_STATE",
+    data: {
+      selfNode: getNodeMeta(node),
+      parent: node.parent ? getNodeMeta(node) : null,
+      children: node.children.map(getNodeMeta),
+    },
+  };
+}
+
+function sendMessage(ws: WebSocket, message: Message) {
+  ws.send(JSON.stringify(message));
+}
+
+function sendNodeState(node: AbstractNode<ID, Client>) {
+  sendMessage(node.value, generateNodeStateMessage(node));
+}
+
+function broadcastRoomState(broadcast: Tree<ID, Client>) {
+  for (const node of broadcast) {
+    sendNodeState(node);
+  }
+}
+
 audienceWss.on("connection", (ws, request) => {
   if (request.url) {
     const roomName = request.url.split("/")[2];
-    let broadcast = broadcasts.get(roomName) || new Tree();
-    if (!broadcasts.has(roomName)) {
-      broadcasts.set(roomName, broadcast);
+    let room = rooms.get(roomName) || new Tree();
+    if (!rooms.has(roomName)) {
+      rooms.set(roomName, room);
     }
     const id = nextId();
 
-    broadcast.insertNode(new Node(id, ws));
+    const node = new Node(id, ws);
+
+    room.insertNode(node);
+
+    broadcastRoomState(room);
 
     ws.on("close", () => {
-      broadcast.removeNode(id);
-      if (broadcast.isEmpty) {
-        broadcasts.delete(id);
+      room.removeNodeByKey(id);
+      if (room.isEmpty) {
+        rooms.delete(id);
+      } else {
+        broadcastRoomState(room);
+      }
+    });
+
+    ws.on("message", (message) => {
+      const parsed = JSON.parse(message.toString());
+      if (typeof parsed === "object") {
+        switch (parsed.type) {
+          case "MESSAGE":
+            {
+              if (parsed.data?.to) {
+                const destinationNode = node.adjacentNodes.find(
+                  (node) => node.key === parsed.data.to
+                );
+              }
+            }
+            break;
+        }
       }
     });
   } else {

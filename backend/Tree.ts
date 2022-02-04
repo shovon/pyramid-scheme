@@ -37,6 +37,12 @@ export default class Tree<K, V> {
   }
 
   get node(): AbstractNode<K, V> | null {
-    return this.root?.node ?? null;
+    return this.root ? Node.bareNode(this.root) : null;
+  }
+
+  *[Symbol.iterator](): IterableIterator<AbstractNode<K, V>> {
+    if (this.root) {
+      yield* this.root;
+    }
   }
 }
