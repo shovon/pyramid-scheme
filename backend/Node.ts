@@ -184,10 +184,10 @@ export default class Node<K, V> implements AbstractNode<K, V> {
     return this.v;
   }
 
-  static bareNode<K, V>(node: Node<K, V>): AbstractNode<K, V> {
+  static bareNode<K, V>(node: AbstractNode<K, V>): AbstractNode<K, V> {
     return {
       get key() {
-        return node.k;
+        return node.key;
       },
       get value() {
         return node.value;
@@ -202,7 +202,7 @@ export default class Node<K, V> implements AbstractNode<K, V> {
         return node.parent ? Node.bareNode(node) : null;
       },
       get children() {
-        return node.children?.map(Node.bareNode);
+        return node.children?.map((child) => Node.bareNode(child)) ?? [];
       },
     };
   }
