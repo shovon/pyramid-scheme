@@ -3,11 +3,11 @@ import { strict as assert } from "assert";
 
 const root = new Node<string, string>("a", "apple");
 
-root.insert(new Node("b", "banana"));
-root.insert(new Node("c", "cherry"));
-root.insert(new Node("d", "durian"));
-root.insert(new Node("e", "elderberry"));
-root.insert(new Node("f", "fig"));
+root.insertNode(new Node("b", "banana"));
+root.insertNode(new Node("c", "cherry"));
+root.insertNode(new Node("d", "durian"));
+root.insertNode(new Node("e", "elderberry"));
+root.insertNode(new Node("f", "fig"));
 
 const expected1 = {
   key: "a",
@@ -43,7 +43,7 @@ const expected1 = {
 
 assert.deepEqual(JSON.parse(JSON.stringify(root.node)), expected1);
 
-root.delete("b");
+root.deleteNodeByKey("b");
 
 const expected2 = {
   key: "a",

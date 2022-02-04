@@ -1,5 +1,7 @@
 import { createServer, Server } from "http";
 import WebSocket, { WebSocketServer } from "ws";
+import Node from "./Node";
+import Tree from "./Tree";
 
 const port = 3030;
 
@@ -8,9 +10,11 @@ const server = createServer();
 const broadcastWss = new WebSocketServer({ noServer: true });
 const audienceWss = new WebSocketServer({ noServer: true });
 
-const broadcasts = new Map<string, Tree<WebSocket>>();
+type Client = WebSocket;
 
 type ID = string;
+
+const broadcasts = new Map<ID, Tree<ID, Client>>();
 
 broadcastWss.on("connection", (ws, request) => {
   if (request.url) {
@@ -19,47 +23,32 @@ broadcastWss.on("connection", (ws, request) => {
   }
 });
 
+let count = 0;
+function nextId() {
+  return (count++).toString();
+}
+
 audienceWss.on("connection", (ws, request) => {
   if (request.url) {
     const roomName = request.url.split("/")[2];
-    let broadcast = broadcasts.get(roomName);
-    if (!broadcast) {
-      broadcast = new Tree();
+    let broadcast = broadcasts.get(roomName) || new Tree();
+    if (!broadcasts.has(roomName)) {
       broadcasts.set(roomName, broadcast);
     }
+    const id = nextId();
 
-    const id = broadcast.addNode(ws);
+    broadcast.insertNode(new Node(id, ws));
 
     ws.on("close", () => {
-      broadcast.removeAudienceMember(id);
+      broadcast.removeNode(id);
       if (broadcast.isEmpty) {
+        broadcasts.delete(id);
       }
     });
   } else {
     ws.close();
   }
 });
-
-class Tree<T> {
-  private root?: Node<T>;
-
-  addNode(value: T) {
-    const node = new Node(value);
-    if (!this.root) {
-      this.root = node;
-    } else {
-      this.root.insert(node);
-    }
-  }
-
-  removeNode(value: T) {}
-
-  setRootNode(ws: WebSocket) {}
-
-  get isEmpty() {
-    return this.root === null;
-  }
-}
 
 server.on("upgrade", (request, socket, head) => {
   if (request.url) {

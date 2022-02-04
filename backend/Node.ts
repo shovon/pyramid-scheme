@@ -1,10 +1,11 @@
 import { strict as assert } from "assert";
+import { EventEmitter } from "events";
 
 /**
  * An abstract node that encapsulate the bare minimum that a node represents.
  * More specifically, it hides away all destructive methods
  */
-type AbstractNode<K, V> = {
+export type AbstractNode<K, V> = {
   readonly key: K;
   readonly value: V;
   readonly left: AbstractNode<K, V> | null;
@@ -18,22 +19,38 @@ type AbstractNode<K, V> = {
 export default class Node<K, V> {
   private _left: Node<K, V> | null = null;
   private _right: Node<K, V> | null = null;
+  private _parent: Node<K, V> | null = null;
 
   constructor(private k: K, private v: V) {}
 
-  private hasCricularReference(node: Node<K, V>): boolean {
-    if (this._left === node) {
-      return true;
+  private setOrInsertLeftNode(node: Node<K, V>) {
+    if (node._parent) {
+      throw new Error("The node is not an orphan");
     }
 
-    if (this._right === node) {
-      return true;
+    if (!this._left) {
+      this._left = node;
+      node._parent = this;
+    } else {
+      this._left.insertNode(node);
     }
 
-    return (
-      (this._left?.hasCricularReference(node) ?? false) ||
-      (this._right?.hasCricularReference(node) ?? false)
-    );
+    this.leftDepth = null;
+  }
+
+  private setOrInsertRightNode(node: Node<K, V>) {
+    if (node._parent) {
+      throw new Error("Not is not an orphan");
+    }
+
+    if (!this._right) {
+      this._right = node;
+      node._parent = this;
+    } else {
+      this._right.insertNode(node);
+    }
+
+    this.rightDepth = null;
   }
 
   /**
@@ -43,28 +60,20 @@ export default class Node<K, V> {
    * @param node The node to insert
    * @returns nothing
    */
-  insert(node: Node<K, V>) {
+  insertNode(node: Node<K, V>) {
+    if (node._parent !== null) {
+      throw new Error("The node is not an orphan");
+    }
+
     assert(node !== this);
 
     const leftDepth = this.getLeftDepth();
     const rightDepth = this.getRightDepth();
 
     if (leftDepth <= rightDepth) {
-      assert(!this._right?.hasCricularReference(node) ?? false);
-      if (!this._left) {
-        this._left = node;
-      } else {
-        this._left.insert(node);
-      }
-      this.leftDepth = null;
+      this.setOrInsertLeftNode(node);
     } else {
-      assert(!this._left?.hasCricularReference(node) ?? false);
-      if (!this._right) {
-        this._right = node;
-      } else {
-        this._right.insert(node);
-      }
-      this.rightDepth = null;
+      this.setOrInsertRightNode(node);
     }
   }
 
@@ -72,40 +81,72 @@ export default class Node<K, V> {
    * Deletes the node specified by the given key
    * @param key The key used to find the node that we intend to delete
    */
-  delete(key: K) {
-    if (this._left && this._left.k === key) {
-      const leftChild = this._left._left;
-      const rightChild = this._left._right;
-      this._left = leftChild;
-      this.leftDepth = null;
-      if (rightChild) {
-        this.insert(rightChild);
-      }
-    } else if (this._right && this._right.k === key) {
-      const leftChild = this._right._left;
-      const rightChild = this._right._right;
-      this._right = leftChild;
-      this.rightDepth = null;
-      if (rightChild) {
-        this.insert(rightChild);
-      }
-    } else {
-      if (this._left) {
-        this._left.delete(key);
+  deleteNodeByKey(key: K) {
+    if (this.left?.k === key) {
+      const left = this.detachLeftSubTree();
+      if (!left) {
+        console.error("This is a weird error");
+        return;
       }
 
-      if (this._right) {
-        this._right.delete(key);
+      const leftChild = left?.detachLeftSubTree() ?? null;
+      const rightChild = left?.detachRightSubTree() ?? null;
+
+      if (leftChild) {
+        this.setOrInsertLeftNode(leftChild);
+      }
+
+      if (rightChild) {
+        this.insertNode(rightChild);
+      }
+    } else if (this.right?.k === key) {
+      const right = this.detachRightSubTree();
+
+      const leftChild = right?.detachLeftSubTree() ?? null;
+      const rightChild = right?.detachRightSubTree() ?? null;
+
+      if (leftChild) {
+        this.setOrInsertRightNode(leftChild);
+      }
+
+      if (rightChild) {
+        this.setOrInsertRightNode(rightChild);
+      }
+    } else {
+      if (this.left) {
+        this.left.deleteNodeByKey(key);
+      }
+
+      if (this.right) {
+        this.right.deleteNodeByKey(key);
       }
     }
   }
 
-  find(k: K): Node<K, V> | null {
+  detachLeftSubTree(): Node<K, V> | null {
+    const left = this._left;
+    this._left = null;
+    if (left) {
+      left._parent = null;
+    }
+    return left;
+  }
+
+  detachRightSubTree(): Node<K, V> | null {
+    const right = this._right;
+    this._right = null;
+    if (right) {
+      right._parent = null;
+    }
+    return right;
+  }
+
+  findNode(k: K): Node<K, V> | null {
     if (this.k === k) {
       return this;
     }
-    const left = this._left?.find(k);
-    const right = this._right?.find(k);
+    const left = this._left?.findNode(k);
+    const right = this._right?.findNode(k);
     return left || right || null;
   }
 
