@@ -111,7 +111,7 @@ function createGraphStateMessage(
 ): GraphStateMessage {
   return {
     type: "GRAPH_STATE",
-    data: essentialNode(node),
+    data: node ? essentialNode(node) : null,
   };
 }
 
