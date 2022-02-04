@@ -130,9 +130,10 @@ function sendGraphState(
   sendMessage(node.value, createGraphStateMessage(tree.node));
 }
 
-function broadcastRoomState(broadcast: Tree<ID, Client>) {
-  for (const node of broadcast) {
+function broadcastRoomState(room: Tree<ID, Client>) {
+  for (const node of room) {
     sendNodeState(node);
+    sendGraphState(node, room);
   }
 }
 
