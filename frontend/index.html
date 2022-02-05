@@ -8,7 +8,9 @@
 
   <body>
     <script>
-      const ws = new WebSocket("ws://localhost:3030");
+      const ws = new WebSocket(
+        "ws://localhost:3030/broadcasts/somethingawesome"
+      );
       ws.addEventListener("message", ({ data }) => {
         console.log(data);
       });

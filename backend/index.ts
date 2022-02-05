@@ -10,14 +10,67 @@ const server = createServer();
 const broadcastWss = new WebSocketServer({ noServer: true });
 const audienceWss = new WebSocketServer({ noServer: true });
 
-type Client = WebSocket;
+type NodeObject = WebSocket;
 
 type ID = string;
 
-const rooms = new Map<ID, Tree<ID, Client>>();
+const rooms = new Map<ID, Tree<ID, NodeObject>>();
+
+const occupiedBroadcasters = new Set<string>();
+
+function getRoomNameFromURPathL(
+  urlPath: string | undefined
+): string | undefined {
+  if (!urlPath) {
+    return;
+  }
+  return urlPath.split("/")[2];
+}
+
+function prepareRoom(roomName: string): Tree<ID, NodeObject> {
+  let room = rooms.get(roomName) || new Tree();
+  if (!rooms.has(roomName)) {
+    rooms.set(roomName, room);
+  }
+  return room;
+}
+
+function sendBroadcasterAlreadyBroadcasting(ws: WebSocket) {
+  sendMessage(ws, {
+    type: "BROADCASTER_ALREADY_BROADCASTING",
+    data: null,
+  });
+}
 
 broadcastWss.on("connection", (ws, request) => {
-  if (request.url) {
+  const roomName = getRoomNameFromURPathL(request.url);
+  if (roomName) {
+    if (occupiedBroadcasters.has(roomName)) {
+      sendBroadcasterAlreadyBroadcasting(ws);
+      ws.close();
+      return;
+    }
+    occupiedBroadcasters.add(roomName);
+
+    const room = prepareRoom(roomName);
+    const id = nextId();
+    const node = new Node(id, ws);
+
+    room.setRootNode(node);
+
+    broadcastRoomState(room);
+
+    ws.on("close", () => {
+      room.removeNodeByKey(id);
+      occupiedBroadcasters.delete(roomName);
+      if (room.isEmpty) {
+        rooms.delete(id);
+      } else {
+        broadcastRoomState(room);
+      }
+    });
+
+    ws.on("message", handleMessage(node));
   } else {
     ws.close();
   }
@@ -27,10 +80,6 @@ let count = 0;
 function nextId() {
   return (count++).toString();
 }
-
-type NodeMeta = {
-  id: ID;
-};
 
 type NodeStateMessage = {
   type: "NODE_STATE";
@@ -71,16 +120,29 @@ type RelayedNodeMessage = {
   };
 };
 
-type Message = NodeStateMessage | RelayedNodeMessage | GraphStateMessage;
+type BroadcasterAlreadyBroadcastingMessage = {
+  type: "BROADCASTER_ALREADY_BROADCASTING";
+  data: null;
+};
 
-function getNodeMeta(node: AbstractNode<ID, Client>): NodeMeta {
+type Message =
+  | NodeStateMessage
+  | RelayedNodeMessage
+  | GraphStateMessage
+  | BroadcasterAlreadyBroadcastingMessage;
+
+type NodeMeta = {
+  id: ID;
+};
+
+function getNodeMeta(node: AbstractNode<ID, NodeObject>): NodeMeta {
   return {
     id: node.key,
   };
 }
 
 function createNodeStateMessage(
-  node: AbstractNode<ID, Client>
+  node: AbstractNode<ID, NodeObject>
 ): NodeStateMessage {
   return {
     type: "NODE_STATE",
@@ -107,7 +169,7 @@ function createRelayMessage(
 }
 
 function createGraphStateMessage(
-  node: AbstractNode<ID, Client> | null
+  node: AbstractNode<ID, NodeObject> | null
 ): GraphStateMessage {
   return {
     type: "GRAPH_STATE",
@@ -119,33 +181,57 @@ function sendMessage(ws: WebSocket, message: Message) {
   ws.send(JSON.stringify(message));
 }
 
-function sendNodeState(node: AbstractNode<ID, Client>) {
+function sendNodeState(node: AbstractNode<ID, NodeObject>) {
   sendMessage(node.value, createNodeStateMessage(node));
 }
 
 function sendGraphState(
-  node: AbstractNode<ID, Client>,
-  tree: Tree<ID, Client>
+  node: AbstractNode<ID, NodeObject>,
+  tree: Tree<ID, NodeObject>
 ) {
   sendMessage(node.value, createGraphStateMessage(tree.node));
 }
 
-function broadcastRoomState(room: Tree<ID, Client>) {
+function broadcastRoomState(room: Tree<ID, NodeObject>) {
   for (const node of room) {
     sendNodeState(node);
     sendGraphState(node, room);
   }
 }
 
-audienceWss.on("connection", (ws, request) => {
-  if (request.url) {
-    const roomName = request.url.split("/")[2];
-    let room = rooms.get(roomName) || new Tree();
-    if (!rooms.has(roomName)) {
-      rooms.set(roomName, room);
+function handleMessage(node: Node<ID, NodeObject>) {
+  return (message: WebSocket.RawData) => {
+    const parsed = JSON.parse(message.toString());
+    if (typeof parsed === "object") {
+      switch (parsed.type) {
+        case "MESSAGE":
+          {
+            if (!!parsed.data?.to) {
+              const destinationNode = node.adjacentNodes.find(
+                (node) => node.key === parsed.data.to
+              );
+              if (destinationNode) {
+                sendMessage(
+                  destinationNode.value,
+                  createRelayMessage(
+                    { from: node.key, to: parsed.data.to },
+                    parsed.data.payload
+                  )
+                );
+              }
+            }
+          }
+          break;
+      }
     }
-    const id = nextId();
+  };
+}
 
+audienceWss.on("connection", (ws, request) => {
+  const roomName = getRoomNameFromURPathL(request.url);
+  if (roomName) {
+    const room = prepareRoom(roomName);
+    const id = nextId();
     const node = new Node(id, ws);
 
     room.insertNode(node);
@@ -161,31 +247,7 @@ audienceWss.on("connection", (ws, request) => {
       }
     });
 
-    ws.on("message", (message) => {
-      const parsed = JSON.parse(message.toString());
-      if (typeof parsed === "object") {
-        switch (parsed.type) {
-          case "MESSAGE":
-            {
-              if (!!parsed.data?.to) {
-                const destinationNode = node.adjacentNodes.find(
-                  (node) => node.key === parsed.data.to
-                );
-                if (destinationNode) {
-                  sendMessage(
-                    destinationNode.value,
-                    createRelayMessage(
-                      { from: node.key, to: parsed.data.to },
-                      parsed.data.payload
-                    )
-                  );
-                }
-              }
-            }
-            break;
-        }
-      }
-    });
+    ws.on("message", handleMessage(node));
   } else {
     ws.close();
   }
