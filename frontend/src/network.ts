@@ -1,3 +1,6 @@
+import { Message } from "./message/message";
+import { MessageToNodeEventType } from "./message/MessageToNode";
+
 interface MessageSender {
   send(message: any): void;
 }
@@ -19,17 +22,7 @@ const parents = new Map<string, Parent>();
 
 const ws = new WebSocket("ws://localhost:3030/broadcasts/thisissomething");
 
-type MessageMessage = {
-  type: "MESSAGE";
-  data: {
-    to: string;
-    payload: any;
-  };
-};
-
-type WebSocketMessage = MessageMessage;
-
-function sendWebSocketMessage(message: WebSocketMessage) {
+function sendWebSocketMessage(message: Message) {
   ws.send(JSON.stringify(message));
 }
 
@@ -41,7 +34,7 @@ type ParentMessage = ParentHelloMessage;
 
 function sendParentMessage(to: string, payload: ParentMessage) {
   sendWebSocketMessage({
-    type: "MESSAGE",
+    type: "",
     data: {
       to,
       payload,
@@ -57,7 +50,7 @@ type ChildMessage = ChildHiMessage;
 
 function sendChildHiMessage(to: string, payload: ChildMessage) {
   sendWebSocketMessage({
-    type: "MESSAGE",
+    type: MessageToNodeEventType,
     data: {
       to,
       payload,
@@ -75,7 +68,7 @@ ws.onmessage = (event) => {
         if (!parent) {
           parent = new Parent({
             send(message: ParentMessage) {
-              ws.send(JSON.stringify({}));
+              ws.send(JSON.stringify(message));
             },
           });
           parents.set(data.parent.id, parent);
