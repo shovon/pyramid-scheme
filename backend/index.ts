@@ -86,7 +86,8 @@ type NodeStateMessage = {
   data: {
     selfNode: NodeMeta;
     parent: NodeMeta | null;
-    children: NodeMeta[];
+    left: NodeMeta | null;
+    right: NodeMeta | null;
   };
 };
 
@@ -149,7 +150,8 @@ function createNodeStateMessage(
     data: {
       selfNode: getNodeMeta(node),
       parent: node.parent ? getNodeMeta(node) : null,
-      children: node.children.map(getNodeMeta),
+      left: node.left ? getNodeMeta(node.left) : null,
+      right: node.right ? getNodeMeta(node.right) : null,
     },
   };
 }
