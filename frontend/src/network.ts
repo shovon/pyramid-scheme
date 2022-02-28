@@ -1,5 +1,10 @@
 import { Message } from "./message/message";
-import { MessageToNodeEventType } from "./message/MessageToNode";
+import { MessageToNode, messageToNodeEventType } from "./message/MessageToNode";
+import { MessageToNodePayload } from "./message/MessageToNodePayload";
+import {
+  MessageToParent,
+  messageToParentEventType,
+} from "./message/MessageToParent";
 
 interface MessageSender {
   send(message: any): void;
@@ -26,36 +31,12 @@ function sendWebSocketMessage(message: Message) {
   ws.send(JSON.stringify(message));
 }
 
-type ParentHelloMessage = {
-  type: "HELLO";
-};
-
-type ParentMessage = ParentHelloMessage;
-
-function sendParentMessage(to: string, payload: ParentMessage) {
-  sendWebSocketMessage({
-    type: "",
-    data: {
-      to,
-      payload,
-    },
-  });
-}
-
-type ChildHiMessage = {
-  type: "HI";
-};
-
-type ChildMessage = ChildHiMessage;
-
-function sendChildHiMessage(to: string, payload: ChildMessage) {
-  sendWebSocketMessage({
-    type: MessageToNodeEventType,
-    data: {
-      to,
-      payload,
-    },
-  });
+function messageToParent(payload: MessageToNodePayload) {
+  const message: MessageToParent = {
+    type: messageToParentEventType,
+    data: payload,
+  };
+  sendWebSocketMessage(message);
 }
 
 ws.onmessage = (event) => {
@@ -67,7 +48,7 @@ ws.onmessage = (event) => {
         let parent = parents.get(data.parent.id);
         if (!parent) {
           parent = new Parent({
-            send(message: ParentMessage) {
+            send(message: MessageToNode) {
               ws.send(JSON.stringify(message));
             },
           });

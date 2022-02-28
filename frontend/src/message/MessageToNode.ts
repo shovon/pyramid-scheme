@@ -15,14 +15,10 @@ export type MessageToNode = {
   };
 };
 
-export const schema = Joi.object({
+export const messageToNodeSchema = Joi.object({
   type: Joi.string().valid(messageToNodeEventType).required(),
   data: {
     to: Joi.string().required(),
     payload: messageToNodePayloadSchema,
   },
 });
-
-export function validateMessageToNode(value: any) {
-  return schema.validate(value);
-}
