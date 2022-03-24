@@ -1,17 +1,37 @@
 import { strict as assert } from "assert";
-import { EventEmitter } from "events";
 
 /**
  * An abstract node that encapsulate the bare minimum that a node represents.
  * More specifically, it hides away all destructive methods
  */
 export interface AbstractNode<K, V> {
+  /**
+   * The lookup key associated with the key-value pair
+   */
   readonly key: K;
+
+  /**
+   * The value associated with the key
+   */
   readonly value: V;
+
+  /**
+   * The parent node.
+   *
+   * An orphaned or a root node will never have a parent, and will thus have a
+   * value of null
+   */
   readonly parent: AbstractNode<K, V> | null;
+
+  /**
+   * The left node. Not all nodes will have a left node.
+   */
   readonly left: AbstractNode<K, V> | null;
+
+  /**
+   * The right node. Not all nodes will have a right node.
+   */
   readonly right: AbstractNode<K, V> | null;
-  readonly children: AbstractNode<K, V>[];
 }
 
 /**
@@ -125,6 +145,14 @@ export default class Node<K, V> implements AbstractNode<K, V> {
     }
   }
 
+  /**
+   * Detaches the left node, and returns it.
+   *
+   * The "this" node will therefore no longer have a left node, and the returned
+   * node will be a new orphaned tree. In the space of nodes, we will now have a
+   * forest of trees
+   * @returns A Node object, that is supposed to be the left node element
+   */
   detachLeftSubTree(): Node<K, V> | null {
     const left = this._left;
     this._left = null;
@@ -134,6 +162,14 @@ export default class Node<K, V> implements AbstractNode<K, V> {
     return left;
   }
 
+  /**
+   * Detaches the right node, and returns it.
+   *
+   * The "this" node will therefore no longer have a left node, and the returned
+   * node will be a new orphaned tree. In the space of nodes, we will now have a
+   * forest of trees
+   * @returns A Node object, that is supposed to be the left node element
+   */
   detachRightSubTree(): Node<K, V> | null {
     const right = this._right;
     this._right = null;
@@ -233,9 +269,6 @@ export default class Node<K, V> implements AbstractNode<K, V> {
       },
       get right() {
         return node.parent ? Node.bareNode(node) : null;
-      },
-      get children() {
-        return node.children?.map((child) => Node.bareNode(child)) ?? [];
       },
     };
   }

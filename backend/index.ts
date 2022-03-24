@@ -93,7 +93,8 @@ type NodeStateMessage = {
 
 type EssentialNode<K> = {
   readonly key: K;
-  readonly children: EssentialNode<K>[];
+  readonly left: EssentialNode<K> | null;
+  readonly right: EssentialNode<K> | null;
 };
 
 function essentialNode<K, V>(node: AbstractNode<K, V>): EssentialNode<K> {
@@ -101,8 +102,11 @@ function essentialNode<K, V>(node: AbstractNode<K, V>): EssentialNode<K> {
     get key() {
       return node.key;
     },
-    get children() {
-      return node.children.map(essentialNode);
+    get left() {
+      return node.left ? essentialNode(node.left) : null;
+    },
+    get right() {
+      return node.right ? essentialNode(node.right) : null;
     },
   };
 }
