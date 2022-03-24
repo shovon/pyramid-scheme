@@ -61,7 +61,7 @@ broadcastWss.on("connection", (ws, request) => {
     broadcastRoomState(room);
 
     ws.on("close", () => {
-      room.removeNodeByKey(id);
+      room.removeValueByKey(id);
       occupiedBroadcasters.delete(roomName);
       if (room.isEmpty) {
         rooms.delete(id);
@@ -195,7 +195,7 @@ function sendGraphState(
   node: AbstractNode<ID, NodeObject>,
   tree: Tree<ID, NodeObject>
 ) {
-  sendMessage(node.value, createGraphStateMessage(tree.node));
+  sendMessage(node.value, createGraphStateMessage(tree.rootNode));
 }
 
 function broadcastRoomState(room: Tree<ID, NodeObject>) {
@@ -245,7 +245,7 @@ audienceWss.on("connection", (ws, request) => {
     broadcastRoomState(room);
 
     ws.on("close", () => {
-      room.removeNodeByKey(id);
+      room.removeValueByKey(id);
       if (room.isEmpty) {
         rooms.delete(id);
       } else {

@@ -179,6 +179,11 @@ export default class Node<K, V> implements AbstractNode<K, V> {
     return right;
   }
 
+  /**
+   * Finds the node, given the key.
+   * @param k The key for which to look for the specific node.
+   * @returns The node if found; null otherwise.
+   */
   findNode(k: K): Node<K, V> | null {
     if (this.k === k) {
       return this;
@@ -212,37 +217,61 @@ export default class Node<K, V> implements AbstractNode<K, V> {
     );
   }
 
+  /**
+   * The key associated with this node.
+   */
   get key() {
     return this.k;
   }
 
+  /**
+   * The value associated with this node.
+   */
   get value() {
     return this.v;
   }
 
+  /**
+   * The left child node.
+   */
   get left() {
     return this._left;
   }
 
+  /**
+   * The right child node.
+   */
   get right() {
     return this._right;
   }
 
-  get children(): AbstractNode<K, V>[] {
-    return [this.left, this.right].filter((v) => !!v) as Node<K, V>[];
-  }
-
+  /**
+   * The parent node.
+   */
   get parent() {
     return this._parent;
   }
 
+  /**
+   * Gets all nodes (left, right, parent) linking with this node.
+   */
   get adjacentNodes(): AbstractNode<K, V>[] {
-    if (this.parent) {
-      return [...this.children, this.parent];
+    const nodes: AbstractNode<K, V>[] = [];
+    if (this.left) {
+      nodes.push(this.left);
     }
-    return this.children;
+    if (this.right) {
+      nodes.push(this.right);
+    }
+    if (this.parent) {
+      nodes.push(this.parent);
+    }
+    return nodes;
   }
 
+  /**
+   * Iterates through all the childrens
+   */
   *[Symbol.iterator](): IterableIterator<AbstractNode<K, V>> {
     if (this._left) {
       yield* this._left;
@@ -253,6 +282,13 @@ export default class Node<K, V> implements AbstractNode<K, V> {
     }
   }
 
+  /**
+   * Derives a node that is devoid of all destructive methods.
+   *
+   * Especially useful for serializing the node into JSON
+   * @param node The node
+   * @returns The node that has been rendered bare of all destructive methods
+   */
   static bareNode<K, V>(node: AbstractNode<K, V>): AbstractNode<K, V> {
     return {
       get key() {

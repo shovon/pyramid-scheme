@@ -41,8 +41,9 @@ export default class Tree<K, V> {
   }
 
   /**
-   *
-   * @param node The node to set as the root ndoe
+   * Sets the root node to the supplied node, and rearranges the tree
+   * @param node The node to set as the root node. The node does not need to
+   *   have any children
    */
   setRootNode(node: Node<K, V>) {
     const oldRoot = this.root;
@@ -52,11 +53,20 @@ export default class Tree<K, V> {
     }
   }
 
+  /**
+   * Gets a `true` or `false` value to determine whether the tree is devoid of
+   * any value (e.g. is empty).
+   *
+   * `true` if the tree is indeed empty; `false` otherwise
+   */
   get isEmpty() {
     return this.root === null;
   }
 
-  get node(): AbstractNode<K, V> | null {
+  /**
+   * Gets the root node in the format of an abstract node
+   */
+  get rootNode(): AbstractNode<K, V> | null {
     return this.root ? Node.bareNode(this.root) : null;
   }
 
