@@ -41,7 +41,11 @@ const expected1 = {
   },
 };
 
-assert.deepEqual(JSON.parse(JSON.stringify(Node.bareNode(root))), expected1);
+assert.deepEqual(
+  JSON.parse(JSON.stringify(Node.noParents(root))),
+  expected1,
+  "Insert"
+);
 
 root.deleteNodeByKey("b");
 
@@ -72,4 +76,8 @@ const expected2 = {
   },
 };
 
-assert.deepEqual(JSON.parse(JSON.stringify(Node.bareNode(root))), expected2);
+assert.deepEqual(
+  JSON.parse(JSON.stringify(Node.noParents(root))),
+  expected2,
+  "Delete"
+);

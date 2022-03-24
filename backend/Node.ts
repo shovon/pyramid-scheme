@@ -35,6 +35,35 @@ export interface AbstractNode<K, V> {
 }
 
 /**
+ * An equivalent of the AbstarctNode, but without any parent information.
+ *
+ * Avoids circular references.
+ *
+ * Especially useful for serializing data.
+ */
+export interface NoParent<K, V> {
+  /**
+   * The lookup key associated with the key-value pair
+   */
+  readonly key: K;
+
+  /**
+   * The value associated with the key
+   */
+  readonly value: V;
+
+  /**
+   * The left node. Not all nodes will have a left node.
+   */
+  readonly left: NoParent<K, V> | null;
+
+  /**
+   * The right node. Not all nodes will have a right node.
+   */
+  readonly right: NoParent<K, V> | null;
+}
+
+/**
  * Represents a key/value pairing in a key/value store, represented by an
  * unordered binary tree
  */
@@ -290,21 +319,47 @@ export default class Node<K, V> implements AbstractNode<K, V> {
    * @returns The node that has been rendered bare of all destructive methods
    */
   static bareNode<K, V>(node: AbstractNode<K, V>): AbstractNode<K, V> {
+    const { key, value, parent, left, right } = node;
     return {
       get key() {
-        return node.key;
+        return key;
       },
       get value() {
-        return node.value;
+        return value;
       },
       get parent() {
-        return node.parent ? Node.bareNode(node) : null;
+        return parent ? Node.bareNode(parent) : null;
       },
       get left() {
-        return node.parent ? Node.bareNode(node) : null;
+        return left ? Node.bareNode(left) : null;
       },
       get right() {
-        return node.parent ? Node.bareNode(node) : null;
+        return right ? Node.bareNode(right) : null;
+      },
+    };
+  }
+
+  /**
+   * Emits nodes without parents
+   * @param node The node to turn into a parentless datastructure
+   * @returns A node with the parent information removed
+   */
+  static noParents(
+    node: AbstractNode<unknown, unknown>
+  ): Omit<NoParent<unknown, unknown>, "parent"> {
+    const { key, value, left, right } = node;
+    return {
+      get key() {
+        return key;
+      },
+      get value() {
+        return value;
+      },
+      get left() {
+        return left ? Node.noParents(left) : null;
+      },
+      get right() {
+        return right ? Node.noParents(right) : null;
       },
     };
   }
