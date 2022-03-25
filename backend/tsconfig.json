@@ -1,5 +1,5 @@
 {
-  "include": ["*.ts", "*.d.ts", "tests/*.ts"],
+  "include": ["src/*.ts", "src/*.d.ts", "src/tests/*.ts"],
   "compilerOptions": {
     "module": "CommonJS",
     "outDir": "build",
