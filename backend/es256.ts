@@ -1,4 +1,4 @@
-// ECDSA, p-256 curve
+// secp256k1 using SHA 256
 
 import * as crypto from "crypto";
 
@@ -8,16 +8,38 @@ import * as crypto from "crypto";
  * @param key The key to import
  * @returns A WebCrypto CryptoKey
  */
-export async function importRawNistEcKey(key: ArrayBuffer) {
+export async function importRawNistEcPublicKey(key: ArrayBuffer) {
   return await crypto.webcrypto.subtle.importKey(
     "raw",
     key,
     {
       name: "ECDSA",
       namedCurve: "P-256",
+      hash: { name: "SHA-256" },
     },
     true,
     ["verify"]
+  );
+}
+
+/**
+ * Imports a JWK-encoded secp256k1 private key
+ * @param key The key to import
+ * @returns A Promise that holds a WebCrypto CryptoKey
+ */
+export async function importJwkPrivateKey(key: JsonWebKey) {
+  return await crypto.webcrypto.subtle.importKey(
+    "jwk",
+    key,
+    {
+      name: "ECDSA",
+      namedCurve: "P-256",
+      hash: {
+        name: "SHA-256",
+      },
+    },
+    false,
+    ["sign"]
   );
 }
 
@@ -32,7 +54,7 @@ export async function verify(
   publicKey: CryptoKey
 ): Promise<boolean> {
   return await crypto.webcrypto.subtle.verify(
-    "ECDSA",
+    { name: "ECDSA", hash: { name: "SHA-256" } },
     publicKey,
     signature,
     buffer
@@ -44,7 +66,18 @@ export async function verify(
  * @param buffer The buffer to run the verification against
  * @param publicKey The key to create signature with
  */
-export async function sign(buffer: ArrayBuffer, publicKey: CryptoKey) {}
+export async function sign(buffer: ArrayBuffer, privateKey: CryptoKey) {
+  return await crypto.webcrypto.subtle.sign(
+    {
+      name: "ECDSA",
+      hash: {
+        name: "SHA-256",
+      },
+    },
+    privateKey,
+    buffer
+  );
+}
 
 /**
  * Generates a WebCrypt key-pair
@@ -55,6 +88,9 @@ export async function generateKeyPair() {
     {
       name: "ECDSA",
       namedCurve: "P-256",
+      hash: {
+        name: "SHA-256",
+      },
     },
     true,
     ["sign", "verify"]
