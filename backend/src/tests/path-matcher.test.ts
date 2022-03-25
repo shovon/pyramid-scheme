@@ -1,4 +1,4 @@
-import { MapLike, match } from "../path-matcher";
+import { MapLike, match, Patterns } from "../path-matcher";
 import { strict as assert } from "assert";
 
 function assertEmpty(dict: MapLike<string, string>) {
@@ -87,4 +87,25 @@ function assertLength(dict: MapLike<string, string>, length: number) {
   assert.equal(matched.params.get("baz"), "baz");
   assertLength(matched.query, 1);
   assert.equal(matched.query.get("something"), "another");
+}
+
+{
+  const patterns = new Patterns<"value">();
+
+  let handled = false;
+
+  patterns
+    .register("/", (matched) => {
+      handled = true;
+      assert(!!matched);
+      assertEmpty(matched.params);
+      assertEmpty(matched.query);
+    })
+    .register("/something", (matched) => {
+      throw new Error("Not supposed to be here");
+    });
+
+  patterns.handle("/", "value");
+
+  assert(handled);
 }
