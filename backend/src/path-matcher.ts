@@ -6,15 +6,24 @@ function isParam(segment: string) {
   return segment.startsWith(":");
 }
 
-interface MapLike<K, V> {
+export interface MapLike<K, V> {
   get(key: K): V | undefined | null;
+  entries(): Iterable<[K, V]>;
 }
 
-type Match = {
+export type Match = {
   params: MapLike<string, string>;
   query: MapLike<string, string>;
 };
 
+/**
+ * This is a path matcher library, that matches a pattern against the supplied
+ * path
+ * @param pattern The pattern to match the path against
+ * @param path The path to match against the pattern
+ * @returns Either a `Match` result, if there was a successful match; null
+ *   otherwise
+ */
 export function match(pattern: string, path: string): Match | null {
   assert(pattern.startsWith("/"));
 
