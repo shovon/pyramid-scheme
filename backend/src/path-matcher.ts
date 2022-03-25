@@ -51,3 +51,31 @@ export function match(pattern: string, path: string): Match | null {
 
   return { params, query: new URLSearchParams(query || "") };
 }
+
+type HandlerValue<T> = Match & { value: T };
+
+type Handler<T> = (result: HandlerValue<T>) => void;
+
+/**
+ * A nice class that matches paths with handlers.
+ *
+ * Works similarly to Node.js' Express or Koa
+ */
+export class Patterns<T> {
+  private patterns: Map<string, Handler<T>> = new Map();
+
+  register(pattern: string, handler: Handler<T>): Patterns<T> {
+    this.patterns.set(pattern, handler);
+    return this;
+  }
+
+  handle(path: string, value: T) {
+    for (const [pattern, handler] of this.patterns.entries()) {
+      const matched = match(pattern, path);
+      if (matched) {
+        handler({ ...matched, value });
+        break;
+      }
+    }
+  }
+}
