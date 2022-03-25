@@ -41,7 +41,7 @@ export function match(pattern: string, path: string): Match | null {
 
   for (const [index, segment] of patternSegments.entries()) {
     if (isParam(segment)) {
-      params.set(segment, pathSegments[index]);
+      params.set(segment.slice(1), pathSegments[index]);
     } else {
       if (segment !== pathSegments[index]) {
         return null;
