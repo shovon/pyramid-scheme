@@ -1,287 +1,78 @@
-import { createServer, Server } from "http";
 import WebSocket, { WebSocketServer } from "ws";
-import Node, { AbstractNode } from "./Node";
+import { Patterns } from "./path-matcher";
+import { noPathSuppliedErrorMessage, sendError } from "./messsages/message";
 import Tree from "./Tree";
+import { IncomingMessage } from "http";
+import { strict as assert } from "assert";
+import Node from "./Node";
 
-const port = 3030;
+function parseNumber(value: string): number | null {
+  const result = parseInt(value);
+  return isNaN(result) ? null : result;
+}
 
-const server = createServer();
+const port = parseNumber(process.env.PORT || "") || 3030;
 
-const broadcastWss = new WebSocketServer({ noServer: true });
-const audienceWss = new WebSocketServer({ noServer: true });
+const wss = new WebSocketServer({ port });
 
-type NodeObject = WebSocket;
+type TreeValue = {};
 
-type ID = string;
+const trees = new Map<string, Tree<string, TreeValue>>();
 
-const rooms = new Map<ID, Tree<ID, NodeObject>>();
-
-const occupiedBroadcasters = new Set<string>();
-
-function getRoomNameFromURPathL(
-  urlPath: string | undefined
-): string | undefined {
-  if (!urlPath) {
-    return;
+function getTree(id: string) {
+  let tree = trees.get(id);
+  if (!tree) {
+    tree = new Tree();
   }
-  return urlPath.split("/")[2];
+  return tree;
 }
 
-function prepareRoom(roomName: string): Tree<ID, NodeObject> {
-  let room = rooms.get(roomName) || new Tree();
-  if (!rooms.has(roomName)) {
-    rooms.set(roomName, room);
-  }
-  return room;
+function removeTree(id: string) {
+  trees.delete(id);
 }
 
-function sendBroadcasterAlreadyBroadcasting(ws: WebSocket) {
-  sendMessage(ws, {
-    type: "BROADCASTER_ALREADY_BROADCASTING",
-    data: null,
-  });
-}
+type PatternValue = {
+  ws: WebSocket;
+  request: IncomingMessage;
+};
 
-broadcastWss.on("connection", (ws, request) => {
-  const roomName = getRoomNameFromURPathL(request.url);
-  if (roomName) {
-    if (occupiedBroadcasters.has(roomName)) {
-      sendBroadcasterAlreadyBroadcasting(ws);
-      ws.close();
-      return;
+const patterns = new Patterns<PatternValue>();
+
+patterns.register(
+  "/trees/:treeId/view",
+  ({ params, value: { ws, request } }) => {
+    const treeId = params.get("treeId");
+    if (typeof treeId !== "string") {
+      throw new Error("Failed to set the tree ID");
     }
-    occupiedBroadcasters.add(roomName);
-
-    const room = prepareRoom(roomName);
-    const id = nextId();
-    const node = new Node(id, ws);
-
-    room.setRootNode(node);
-
-    broadcastRoomState(room);
-
-    ws.on("close", () => {
-      room.removeValueByKey(id);
-      occupiedBroadcasters.delete(roomName);
-      if (room.isEmpty) {
-        rooms.delete(id);
-      } else {
-        broadcastRoomState(room);
-      }
-    });
-
-    ws.on("message", handleMessage(node));
-  } else {
-    ws.close();
+    const tree = getTree(treeId);
+    // tree.insertNode(new Node());
+    ws.on("close", () => {});
   }
-});
+);
+patterns.register(
+  "/trees/:treeId/view/structure-only",
+  ({ params, value: { ws, request } }) => {}
+);
+patterns.register(
+  "/trees/:treeId/broadcast",
+  ({ params, value: { ws, request } }) => {}
+);
 
-let count = 0;
-function nextId() {
-  return (count++).toString();
-}
-
-type NodeStateMessage = {
-  type: "NODE_STATE";
-  data: {
-    selfNode: NodeMeta;
-    parent: NodeMeta | null;
-    left: NodeMeta | null;
-    right: NodeMeta | null;
-  };
-};
-
-type EssentialNode<K> = {
-  readonly key: K;
-  readonly left: EssentialNode<K> | null;
-  readonly right: EssentialNode<K> | null;
-};
-
-function essentialNode<K, V>(node: AbstractNode<K, V>): EssentialNode<K> {
-  return {
-    get key() {
-      return node.key;
-    },
-    get left() {
-      return node.left ? essentialNode(node.left) : null;
-    },
-    get right() {
-      return node.right ? essentialNode(node.right) : null;
-    },
-  };
-}
-
-type GraphStateMessage = {
-  type: "GRAPH_STATE";
-  data: EssentialNode<ID> | null;
-};
-
-type RelayedNodeMessage = {
-  type: "MESSAGE";
-  data: {
-    from: ID;
-    to: ID;
-    payload: any;
-  };
-};
-
-type BroadcasterAlreadyBroadcastingMessage = {
-  type: "BROADCASTER_ALREADY_BROADCASTING";
-  data: null;
-};
-
-type Message =
-  | NodeStateMessage
-  | RelayedNodeMessage
-  | GraphStateMessage
-  | BroadcasterAlreadyBroadcastingMessage;
-
-type NodeMeta = {
-  id: ID;
-};
-
-function getNodeMeta(node: AbstractNode<ID, NodeObject>): NodeMeta {
-  return {
-    id: node.key,
-  };
-}
-
-function createNodeStateMessage(
-  node: AbstractNode<ID, NodeObject>
-): NodeStateMessage {
-  return {
-    type: "NODE_STATE",
-    data: {
-      selfNode: getNodeMeta(node),
-      parent: node.parent ? getNodeMeta(node) : null,
-      left: node.left ? getNodeMeta(node.left) : null,
-      right: node.right ? getNodeMeta(node.right) : null,
-    },
-  };
-}
-
-function createRelayMessage(
-  { from, to }: { from: ID; to: ID },
-  payload: any
-): RelayedNodeMessage {
-  return {
-    type: "MESSAGE",
-    data: {
-      from,
-      to,
-      payload,
-    },
-  };
-}
-
-function createGraphStateMessage(
-  node: AbstractNode<ID, NodeObject> | null
-): GraphStateMessage {
-  return {
-    type: "GRAPH_STATE",
-    data: node ? essentialNode(node) : null,
-  };
-}
-
-function sendMessage(ws: WebSocket, message: Message) {
-  ws.send(JSON.stringify(message));
-}
-
-function sendNodeState(node: AbstractNode<ID, NodeObject>) {
-  sendMessage(node.value, createNodeStateMessage(node));
-}
-
-function sendGraphState(
-  node: AbstractNode<ID, NodeObject>,
-  tree: Tree<ID, NodeObject>
-) {
-  sendMessage(node.value, createGraphStateMessage(tree.rootNode));
-}
-
-function broadcastRoomState(room: Tree<ID, NodeObject>) {
-  for (const node of room) {
-    sendNodeState(node);
-    sendGraphState(node, room);
-  }
-}
-
-function handleMessage(node: Node<ID, NodeObject>) {
-  return (message: WebSocket.RawData) => {
-    const parsed = JSON.parse(message.toString());
-    if (typeof parsed === "object") {
-      switch (parsed.type) {
-        case "MESSAGE":
-          {
-            if (!!parsed.data?.to) {
-              const destinationNode = node.adjacentNodes.find(
-                (node) => node.key === parsed.data.to
-              );
-              if (destinationNode) {
-                sendMessage(
-                  destinationNode.value,
-                  createRelayMessage(
-                    { from: node.key, to: parsed.data.to },
-                    parsed.data.payload
-                  )
-                );
-              }
-            }
-          }
-          break;
-      }
-    }
-  };
-}
-
-audienceWss.on("connection", (ws, request) => {
-  const roomName = getRoomNameFromURPathL(request.url);
-  if (roomName) {
-    const room = prepareRoom(roomName);
-    const id = nextId();
-    const node = new Node(id, ws);
-
-    room.insertNode(node);
-
-    broadcastRoomState(room);
-
-    ws.on("close", () => {
-      room.removeValueByKey(id);
-      if (room.isEmpty) {
-        rooms.delete(id);
-      } else {
-        broadcastRoomState(room);
-      }
-    });
-
-    ws.on("message", handleMessage(node));
-  } else {
-    ws.close();
-  }
-});
-
-server.on("upgrade", (request, socket, head) => {
+wss.on("connection", (ws, request) => {
   if (request.url) {
-    const parts = request.url.split("/");
-    if (parts.length === 3 || parts.length === 4) {
-      if (parts[1] === "broadcasts") {
-        if (parts.length === 4 && parts[3] === "broadcaster") {
-          broadcastWss.handleUpgrade(request, socket, head, function (ws) {
-            broadcastWss.emit("connection", ws, request);
-          });
-          return;
-        } else if (parts.length === 3) {
-          audienceWss.handleUpgrade(request, socket, head, function (ws) {
-            audienceWss.emit("connection", ws, request);
-          });
-          return;
-        }
-      }
-    }
+    patterns.dispatch(request.url, { ws, request });
+  } else {
+    sendError(ws, {
+      errors: [
+        {
+          title: noPathSuppliedErrorMessage,
+          detail:
+            "In the HTTP/WebSocket upgrade request, a URL path was not " +
+            "provided, and thus can't make sense of the WebSocket connection",
+        },
+      ],
+    });
+    ws.close();
   }
-
-  socket.destroy();
-});
-
-server.listen(port, function (this: Server) {
-  console.log(this.address());
 });

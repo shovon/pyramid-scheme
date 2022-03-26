@@ -69,7 +69,7 @@ export class Patterns<T> {
     return this;
   }
 
-  handle(path: string, value: T) {
+  dispatch(path: string, value: T) {
     for (const [pattern, handler] of this.patterns.entries()) {
       const matched = match(pattern, path);
       if (matched) {

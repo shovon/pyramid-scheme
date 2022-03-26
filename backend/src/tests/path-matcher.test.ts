@@ -105,7 +105,7 @@ function assertLength(dict: MapLike<string, string>, length: number) {
       throw new Error("Not supposed to be here");
     });
 
-  patterns.handle("/", "value");
+  patterns.dispatch("/", "value");
 
   assert(handled);
 }
