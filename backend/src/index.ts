@@ -23,6 +23,7 @@ function getTree(id: string) {
   let tree = trees.get(id);
   if (!tree) {
     tree = new Tree();
+    trees.set(id, tree);
   }
   return tree;
 }
