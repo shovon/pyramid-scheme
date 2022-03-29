@@ -84,20 +84,25 @@ patterns.register(
     });
   }
 );
-patterns.register("/trees/:treeId/broadcast", ({ params, value: { ws } }) => {
-  const treeId = params.get("treeId");
-  assert(typeof treeId === "string");
+patterns.register(
+  "/trees/:treeId/broadcast/:rootId",
+  ({ params, value: { ws } }) => {
+    const treeId = params.get("treeId");
+    const rootId = params.get("rootId");
+    assert(typeof treeId === "string");
+    assert(typeof rootId === "string");
 
-  type TreeState =
-    | {
-        type: "AWAITING_CHALLENGE_RESPONSE";
-      }
-    | {
-        type: "VALIDATED";
-      };
+    type TreeState =
+      | {
+          type: "AWAITING_CHALLENGE_RESPONSE";
+        }
+      | {
+          type: "VALIDATED";
+        };
 
-  const challenge = crypto.randomBytes(16);
-});
+    const challenge = crypto.randomBytes(16);
+  }
+);
 
 wss.on("connection", (ws, request) => {
   if (request.url) {

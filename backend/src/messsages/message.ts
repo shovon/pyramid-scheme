@@ -12,6 +12,7 @@ export type ErrorObject = {
     parameter?: string;
     [key: string]: any;
   };
+  meta?: any;
 };
 
 export type ErrorResponse = {
