@@ -1,4 +1,5 @@
 import Node, { AbstractNode } from "./Node";
+import { Subject, Subscribable, createSubject } from "./subscriber";
 
 /**
  * Represents a tree in the network.
@@ -8,6 +9,7 @@ import Node, { AbstractNode } from "./Node";
  */
 export default class Tree<K, V> {
   private root: Node<K, V> | null = null;
+  private subject: Subject<Tree<K, V>> = createSubject();
 
   /**
    * Inserts a node into the tree
@@ -19,6 +21,7 @@ export default class Tree<K, V> {
     } else {
       this.root.insertNode(node);
     }
+    this.subject.emit(this);
   }
 
   /**
@@ -38,6 +41,7 @@ export default class Tree<K, V> {
     } else {
       this.root?.deleteNodeByKey(key);
     }
+    this.subject.emit(this);
   }
 
   /**
@@ -51,6 +55,7 @@ export default class Tree<K, V> {
     if (oldRoot) {
       this.root.insertNode(oldRoot);
     }
+    this.subject.emit(this);
   }
 
   /**
@@ -70,6 +75,16 @@ export default class Tree<K, V> {
     return this.root ? Node.bareNode(this.root) : null;
   }
 
+  /**
+   * A subscribable object that handles tree change events
+   */
+  get treeChangeEvents(): Subscribable<Tree<K, V>> {
+    return { subscribe: this.subject.subscribe };
+  }
+
+  /**
+   * Allows for iterating all nodes in the tree (not only the keys and values)
+   */
   *[Symbol.iterator](): IterableIterator<AbstractNode<K, V>> {
     if (this.root) {
       yield* this.root;

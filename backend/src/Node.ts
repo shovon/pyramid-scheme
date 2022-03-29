@@ -346,7 +346,7 @@ export default class Node<K, V> implements AbstractNode<K, V> {
    */
   static noParents(
     node: AbstractNode<unknown, unknown>
-  ): Omit<NoParent<unknown, unknown>, "parent"> {
+  ): NoParent<unknown, unknown> {
     const { key, value, left, right } = node;
     return {
       get key() {
@@ -360,6 +360,27 @@ export default class Node<K, V> implements AbstractNode<K, V> {
       },
       get right() {
         return right ? Node.noParents(right) : null;
+      },
+    };
+  }
+
+  static map<V, K>(
+    node: NoParent<unknown, V>,
+    fn: (value: V) => K
+  ): NoParent<unknown, K> {
+    const { key, value, left, right } = node;
+    return {
+      get key() {
+        return key;
+      },
+      get value() {
+        return fn(value);
+      },
+      get left() {
+        return left ? Node.map(left, fn) : null;
+      },
+      get right() {
+        return right ? Node.map(right, fn) : null;
       },
     };
   }
