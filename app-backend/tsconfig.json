@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "module": "CommonJS",
+    "outDir": "build",
+    "target": "ES2020",
+
+    "esModuleInterop": true,
+    "noImplicitAny": true,
+    "noImplicitReturns": true,
+    "noImplicitThis": true,
+    "strictBindCallApply": true,
+    "strictFunctionTypes": true,
+    "strictNullChecks": true,
+    "strictPropertyInitialization": true,
+    "downlevelIteration": true,
+    "allowUnreachableCode": false,
+    "useUnknownInCatchVariables": true,
+    "noImplicitOverride": true
+  }
+}
