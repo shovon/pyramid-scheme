@@ -48,6 +48,11 @@ export default class RootNodeManager {
   }
 
   constructor(private ws: WebSocket, private nodeId: string) {
+    // At initialization, the node state is at "PREPARING_CHALLENGE".
+    //
+    // This is because we are parsing the nodeId, and turning it into a key
+    // that the ECDSA scheme can understand
+
     this.publicKeyBuffer = Buffer.from(nodeId, "base64");
     if (this.publicKeyBuffer.length !== 65) {
       sendBadKeyError(
@@ -62,6 +67,7 @@ export default class RootNodeManager {
     }
     this.ecdsaKey
       .then(() => {
+        this.nodeState = { type: "AWAITING_CHALLENGE_RESPONSE" };
         sendChallenge(ws, this.challenge.toString("base64"));
       })
       .catch((e) => {
