@@ -18,6 +18,7 @@ import {
 } from "./messsages/client-message";
 import WebSocket from "ws";
 import { sendChallenge } from "./messsages/server-message";
+import { send } from "process";
 
 export type NodeState =
   | {
@@ -34,19 +35,47 @@ export default class RootNodeManager {
   private nodeState: NodeState = { type: "PREPARING_CHALLENGE" };
   private challenge: Buffer = crypto.randomBytes(16);
   private publicKeyBuffer: Buffer;
+  private _ecdsaKey: CryptoKey | null = null;
+
+  get ecdsaKey(): Promise<CryptoKey> {
+    if (this._ecdsaKey) {
+      return Promise.resolve(this._ecdsaKey);
+    }
+    return importRawNistEcPublicKey(this.publicKeyBuffer).then((key) => {
+      this._ecdsaKey = key;
+      return key;
+    });
+  }
 
   constructor(private ws: WebSocket, private nodeId: string) {
-    sendChallenge(ws, this.challenge.toString("base64"));
-
     this.publicKeyBuffer = Buffer.from(nodeId, "base64");
     if (this.publicKeyBuffer.length !== 65) {
-      sendBadKeyError(ws, {
-        message: `Expected the tree ID to be a base64-encoded NIST-format 65-byte ECDSA public key, but instead got a key of length ${this.publicKeyBuffer.length}`,
-        key: nodeId,
-      });
+      sendBadKeyError(
+        ws,
+        {
+          message: `Expected the tree ID to be a base64-encoded NIST-format 65-byte ECDSA public key, but instead got a key of length ${this.publicKeyBuffer.length}`,
+          key: nodeId,
+        },
+        "client"
+      );
       return;
     }
-    importRawNistEcPublicKey(this.publicKeyBuffer).then((e) => {});
+    this.ecdsaKey
+      .then(() => {
+        sendChallenge(ws, this.challenge.toString("base64"));
+      })
+      .catch((e) => {
+        sendBadKeyError(
+          ws,
+          {
+            message: "An error occurred attempting to parse the key",
+            key: nodeId,
+            errorObject: e,
+          },
+          "unsure"
+        );
+        ws.close();
+      });
 
     ws.addEventListener("message", (data) => {
       const dataValidation = clientMessageSchema.validate(data);
@@ -123,7 +152,7 @@ export default class RootNodeManager {
     if (m.message.compare(this.challenge) !== 0) {
       return this.challengeFailed(m, messageId);
     }
-    const key = await importRawNistEcPublicKey(this.publicKeyBuffer.buffer);
+    const key = await this.ecdsaKey;
     if (!(await verify(m.message, m.signature, key))) {
       return this.challengeFailed(m, messageId);
     }

@@ -275,30 +275,37 @@ export type BadKeyError = {
     type: "BAD_KEY_FORMAT";
     errors: [
       {
-        title: "Tree ID is in a bad format";
+        title: "Tree ID is in an unparsable format";
         detail: string;
         meta: {
           key: string;
+          errorObject: any;
         };
       }
     ];
-    errorOriginator: "client";
+    errorOriginator: "client" | "unsure";
   };
 };
 
 export function sendBadKeyError(
   ws: WebSocket,
-  { message, key }: { message: string; key: string }
+  {
+    message,
+    key,
+    errorObject,
+  }: { message: string; key: string; errorObject?: any },
+  originator: "client" | "unsure"
 ) {
   const error: BadKeyError = {
     error: {
       type: "BAD_KEY_FORMAT",
       errors: [
         {
-          title: "Tree ID is in a bad format",
+          title: "Tree ID is in an unparsable format",
           detail: message,
           meta: {
             key,
+            errorObject,
           },
         },
       ],
