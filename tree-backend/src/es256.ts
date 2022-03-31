@@ -45,11 +45,11 @@ export async function importJwkPrivateKey(key: JsonWebKey) {
 
 /**
  * Verifies a signatures associated with the buffer, given teh supplied key
- * @param buffer The buffer to run the verification against
+ * @param message The buffer to run the verification against
  * @param key The key to verify the signature with
  */
 export async function verify(
-  buffer: ArrayBuffer,
+  message: ArrayBuffer,
   signature: ArrayBuffer,
   publicKey: CryptoKey
 ): Promise<boolean> {
@@ -57,7 +57,7 @@ export async function verify(
     { name: "ECDSA", hash: { name: "SHA-256" } },
     publicKey,
     signature,
-    buffer
+    message
   );
 }
 

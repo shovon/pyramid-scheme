@@ -59,6 +59,40 @@ export default class Tree<K, V> {
   }
 
   /**
+   * Deletes a node from the tree, given the key
+   * @param key The key by which to find and delete the node from the tree
+   */
+  deleteNodeByKey(key: K) {
+    if (!this.root) {
+      return;
+    }
+
+    if (this.root.key === key) {
+      const left = this.root.left;
+      const right = this.root.right;
+      if (!left) {
+        this.root = right;
+      } else {
+        this.root = left;
+        if (right) {
+          this.root.insertNode(right);
+        }
+      }
+    } else {
+      this.root.deleteNodeByKey(key);
+    }
+  }
+
+  /**
+   * Determines if the tree has a node given the key; false otherwise
+   * @param id The ID by which to check if the tree has a key set
+   * @returns true if the tree has the node given the key; false otherwise
+   */
+  has(id: K): boolean {
+    return this.root ? !!this.root.findNode(id) : false;
+  }
+
+  /**
    * Gets a `true` or `false` value to determine whether the tree is devoid of
    * any value (e.g. is empty).
    *

@@ -1,11 +1,15 @@
 import WebSocket, { WebSocketServer } from "ws";
 import { Patterns } from "./path-matcher";
-import { noPathSuppliedErrorMessage, sendError } from "./messsages/message";
+import {
+  // sendBadURLPathError,
+  sendNodeIdInUseError,
+} from "./messsages/server-message";
 import Tree from "./Tree";
 import { IncomingMessage } from "http";
 import { strict as assert } from "assert";
 import Node from "./Node";
-import * as crypto from "crypto";
+import RootNodeManager from "./root-node";
+import { sendBadURLPathError } from "./messsages/server-errors";
 
 function parseNumber(value: string): number | null {
   const result = parseInt(value);
@@ -41,10 +45,6 @@ function removeTree(id: string) {
   trees.delete(id);
 }
 
-function map(value: NodeValue) {
-  return value.state;
-}
-
 type PatternValue = {
   ws: WebSocket;
   request: IncomingMessage;
@@ -52,21 +52,17 @@ type PatternValue = {
 
 const patterns = new Patterns<PatternValue>();
 
-patterns.register(
-  "/trees/:treeId/view/:nodeId",
-  ({ params, value: { ws } }) => {
-    const treeId = params.get("treeId");
-    const nodeId = params.get("nodeId");
-    assert(typeof treeId === "string");
-    assert(typeof nodeId === "string");
+patterns.register("/trees/:treeId/view", ({ params, value: { ws } }) => {
+  const treeId = params.get("treeId");
+  assert(typeof treeId === "string");
 
-    const tree = getTree(treeId);
-    tree.insertNode(new Node(nodeId, { socket: ws, state: {} }));
-    ws.on("close", () => {
-      tree.removeValueByKey(nodeId);
-    });
-  }
-);
+  const tree = getTree(treeId);
+
+  tree.insertNode(new Node(nodeId, { socket: ws, state: {} }));
+  ws.on("close", () => {
+    tree.removeValueByKey(nodeId);
+  });
+});
 patterns.register(
   "/trees/:treeId/view/structure-only",
   ({ params, value: { ws } }) => {
@@ -76,7 +72,7 @@ patterns.register(
     const tree = getTree(treeId);
     const unsubscribe = tree.treeChangeEvents.subscribe((tree) => {
       if (tree.rootNode) {
-        Node.map(tree.rootNode, map);
+        const result = Node.map(tree.rootNode, (value) => value.state);
       }
     });
     ws.on("close", () => {
@@ -84,38 +80,35 @@ patterns.register(
     });
   }
 );
-patterns.register(
-  "/trees/:treeId/broadcast/:rootId",
-  ({ params, value: { ws } }) => {
-    const treeId = params.get("treeId");
-    const rootId = params.get("rootId");
-    assert(typeof treeId === "string");
-    assert(typeof rootId === "string");
 
-    type TreeState =
-      | {
-          type: "AWAITING_CHALLENGE_RESPONSE";
-        }
-      | {
-          type: "VALIDATED";
-        };
+patterns.register("/trees/:treeId/broadcast", ({ params, value: { ws } }) => {
+  const treeId = params.get("treeId");
+  assert(typeof treeId === "string");
 
-    const challenge = crypto.randomBytes(16);
+  const tree = getTree(treeId);
+
+  if (tree.has(treeId)) {
+    sendNodeIdInUseError(ws);
+    if (tree.isEmpty) {
+      removeTree(treeId);
+    }
   }
-);
+
+  const manager = new RootNodeManager(ws, treeId);
+
+  ws.on("close", () => {
+    tree.removeValueByKey(treeId);
+  });
+});
 
 wss.on("connection", (ws, request) => {
   if (request.url) {
     patterns.dispatch(request.url, { ws, request });
   } else {
-    sendError(ws, [
-      {
-        title: noPathSuppliedErrorMessage,
-        detail:
-          "In the HTTP/WebSocket upgrade request, a URL path was not " +
-          "provided, and thus can't make sense of the WebSocket connection",
-      },
-    ]);
+    if (typeof request.url !== "string") {
+      sendBadURLPathError(ws, request.url);
+    } else {
+    }
     ws.close();
   }
 });
