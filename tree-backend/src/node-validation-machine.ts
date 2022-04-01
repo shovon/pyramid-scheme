@@ -19,6 +19,7 @@ import {
 import WebSocket from "ws";
 import { sendChallenge } from "./messsages/server-message";
 import { logger } from "./logger";
+import { debug } from "console";
 
 export type NodeState =
   | {
@@ -179,6 +180,11 @@ export default class NodeValidationMachine {
     m: InferType<typeof messageSignatureSchema>,
     messageId: string
   ) {
+    logger.trace({
+      className: "NodeValidationEngine",
+      method: "challengeFailed",
+      messageId,
+    });
     sendChallengeFailed(
       this.ws,
       m.message.toString("base64"),
@@ -186,28 +192,45 @@ export default class NodeValidationMachine {
       m.signature.toString("base64"),
       messageId
     );
+    logger.debug("Challenge failed. Closing connection");
     this.ws.close();
   }
+
+  // This variable exists to avoid race conditions
+  private respondingToChallenge: boolean = false;
 
   private async handleChallengeResponse(
     m: InferType<typeof messageSignatureSchema>,
     messageId: string
   ) {
+    logger.trace({
+      className: "NodeValidationMachine",
+      messageId,
+    });
     if (!this.respondingToChallenge) {
+      logger.trace("Setting responding to challenge to true, as a lock");
+      // NOTE: this could have been a state in the `nodeState` field
       this.respondingToChallenge = true;
     } else {
+      logger.trace(
+        "Already have a challenge response. Not going to process any further"
+      );
       return sendAlreadyHaveChallengeResponse(this.ws, messageId);
     }
     if (m.message.compare(this.challenge) !== 0) {
+      logger.debug(
+        "The message received from the challenge does not match what was given out for the challenge"
+      );
       return this.challengeFailed(m, messageId);
     }
     const key = await this.ecdsaKey;
     if (!(await verify(m.message, m.signature, key))) {
       return this.challengeFailed(m, messageId);
     }
+
+    this.nodeState = { type: "VALIDATED" };
   }
 
-  private respondingToChallenge: boolean = false;
   private async handleAwaitingChallenge(
     message: InferType<typeof awaitingResponseSchema>,
     messageId: string

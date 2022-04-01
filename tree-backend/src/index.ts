@@ -104,7 +104,7 @@ patterns.register("/trees/:treeId/broadcast", ({ params, value: { ws } }) => {
 });
 
 wss.on("connection", (ws, request) => {
-  logger.debug(
+  logger.info(
     {
       remoteAddress: request.socket.remoteAddress,
       url: request.url,
