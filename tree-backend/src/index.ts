@@ -98,6 +98,7 @@ patterns.register("/trees/:treeId/broadcast", ({ params, value: { ws } }) => {
   new NodeValidationMachine(ws, treeId);
 
   ws.on("close", () => {
+    logger.debug("The root node seems to have left the tree");
     // tree.removeValueByKey(treeId);
   });
 });
