@@ -68,9 +68,25 @@ export interface NoParent<K, V> {
  * unordered binary tree
  */
 export default class Node<K, V> implements AbstractNode<K, V> {
-  private _left: Node<K, V> | null = null;
-  private _right: Node<K, V> | null = null;
+  private __left: Node<K, V> | null = null;
+  private __right: Node<K, V> | null = null;
   private _parent: Node<K, V> | null = null;
+
+  private get _left() {
+    return this.__left;
+  }
+
+  private get _right() {
+    return this.__right;
+  }
+
+  private set _left(node: Node<K, V> | null) {
+    this.__left = node;
+  }
+
+  private set _right(node: Node<K, V> | null) {
+    this.__right = node;
+  }
 
   constructor(private k: K, private v: V) {}
 

@@ -18,7 +18,7 @@ import {
 } from "./messsages/client-message";
 import WebSocket from "ws";
 import { sendChallenge } from "./messsages/server-message";
-import { send } from "process";
+import { logger } from "./logger";
 
 export type NodeState =
   | {
@@ -31,8 +31,13 @@ export type NodeState =
       type: "VALIDATED";
     };
 
-// You can think of this as a state machine
-export default class RootNodeManager {
+// NOTE: the code here could have been a lot simpler, honestly
+/**
+ * A state machine that will also send a few messages, on behalf of the client.
+ */
+export default class NodeValidationMachine {
+  // This will represent the state of the machine.
+  //
   // The initial state is going to represent that that the manager is reparing
   // the challenge
   private nodeState: NodeState = { type: "PREPARING_CHALLENGE" };
@@ -49,9 +54,16 @@ export default class RootNodeManager {
 
   // Getes a promise, that will contain the CryptoKey
   get ecdsaKey(): Promise<CryptoKey> {
+    logger.trace("A request was made to get the crypto key");
     if (this._ecdsaKey) {
+      logger.trace(
+        "A crypto key was already available. Resolving that, instead"
+      );
       return Promise.resolve(this._ecdsaKey);
     }
+    logger.trace(
+      "No public key defined yet; creating a new one from the public key buffer"
+    );
     return importRawNistEcPublicKey(this.publicKeyBuffer).then((key) => {
       this._ecdsaKey = key;
       return key;
@@ -59,6 +71,8 @@ export default class RootNodeManager {
   }
 
   constructor(private ws: WebSocket, private nodeId: string) {
+    logger.trace("Creating a new validation engine");
+
     // At initialization, the node state is at "PREPARING_CHALLENGE".
     //
     // This is because we are parsing the nodeId, and turning it into a key
@@ -66,6 +80,10 @@ export default class RootNodeManager {
 
     this.publicKeyBuffer = Buffer.from(nodeId, "base64");
     if (this.publicKeyBuffer.length !== 65) {
+      logger.debug(
+        { publicKey: nodeId },
+        "We were not provided with a valid public key as the Node ID; too short"
+      );
       sendBadKeyError(
         ws,
         {
@@ -74,10 +92,12 @@ export default class RootNodeManager {
         },
         "client"
       );
-      // And kill the connection
+      logger.trace("Closing the connection, because of bad key");
       ws.close();
       return;
     }
+
+    logger.trace("We have a valid public key");
 
     this.ecdsaKey.then(
       () => {

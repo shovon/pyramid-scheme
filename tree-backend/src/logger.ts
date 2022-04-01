@@ -4,4 +4,4 @@ export const logger = pino({
   level: "trace",
 });
 
-logger.debug({}, "Started the logger");
+logger.trace("Started the logger");

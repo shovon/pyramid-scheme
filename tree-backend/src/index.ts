@@ -4,10 +4,9 @@ import Tree from "./Tree";
 import { IncomingMessage } from "http";
 import { strict as assert } from "assert";
 import Node from "./Node";
-import RootNodeManager from "./root-node";
+import NodeValidationMachine from "./node-validation-machine";
 import {
   sendBadURLPathError,
-  sendNodeIdInUseError,
   sendNoURLProvidedError,
 } from "./messsages/server-errors";
 import { logger } from "./logger";
@@ -30,10 +29,13 @@ type NodeValue = {
 const trees = new Map<string, Tree<string, NodeValue>>();
 
 function getTree(id: string) {
+  logger.trace(`Gettig tree of ID ${id}`);
   let tree = trees.get(id);
   if (!tree) {
+    logger.trace(`Tree with ID ${id} not found. Creating a new one`);
     tree = new Tree();
     tree.treeChangeEvents.subscribe((tree) => {
+      logger.debug("Tree is empty");
       if (tree.isEmpty) {
         removeTree(id);
       }
@@ -83,6 +85,7 @@ patterns.register(
       }
     });
     ws.on("close", () => {
+      logger.debug("Connection to structure-only viewer has been closed");
       unsubscribe();
     });
   }
@@ -92,31 +95,32 @@ patterns.register("/trees/:treeId/broadcast", ({ params, value: { ws } }) => {
   const treeId = params.get("treeId");
   assert(typeof treeId === "string");
 
-  const tree = getTree(treeId);
-
-  if (tree.has(treeId)) {
-    sendNodeIdInUseError(ws, treeId);
-    if (tree.isEmpty) {
-      removeTree(treeId);
-    }
-  }
-
-  new RootNodeManager(ws, treeId);
+  new NodeValidationMachine(ws, treeId);
 
   ws.on("close", () => {
-    tree.removeValueByKey(treeId);
+    // tree.removeValueByKey(treeId);
   });
 });
 
 wss.on("connection", (ws, request) => {
+  logger.debug(
+    {
+      remoteAddress: request.socket.remoteAddress,
+      url: request.url,
+    },
+    "Got a new connection"
+  );
   if (request.url) {
     patterns.dispatch(request.url, { ws, request });
   } else {
+    logger.debug("URL was empty");
     if (typeof request.url !== "string") {
+      logger.trace("URL was not a string, for some reason");
       sendNoURLProvidedError(ws);
     } else {
       sendBadURLPathError(ws, request.url);
     }
+    logger.debug("Closing the connection");
     ws.close();
   }
 });

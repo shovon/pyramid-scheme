@@ -1,5 +1,5 @@
 import WebSocket from "ws";
-import { NodeState } from "../root-node";
+import { NodeState } from "../node-validation-machine";
 import { InferType } from "../validator";
 import { awaitingResponseSchema } from "./client-message";
 import { sendMessage } from "./server-message";
@@ -317,32 +317,31 @@ export function sendBadKeyError(
 
 export type NoPathAvailable = {
   error: {
-    type: "NO_PATH_AVAILABLE",
+    type: "NO_PATH_AVAILABLE";
     errors: [
       {
-        title: 'WebSocket request path not available',
-        detail: 'A request URL path was not available when processing the HTTP upgrade request for the purposes of establishing a WebSocket connection'
+        title: "WebSocket request path not available";
+        detail: "A request URL path was not available when processing the HTTP upgrade request for the purposes of establishing a WebSocket connection";
       }
-    ],
-    errorOriginator: 'unsure'
-  }
-}
+    ];
+    errorOriginator: "unsure";
+  };
+};
 
-export function sendNoURLProvidedError(
-  ws: WebSocket,
-) {
+export function sendNoURLProvidedError(ws: WebSocket) {
   const error: NoPathAvailable = {
     error: {
-      type: 'NO_PATH_AVAILABLE',
+      type: "NO_PATH_AVAILABLE",
       errors: [
         {
-          title: 'WebSocket request path not available',
-          detail: 'A request URL path was not available when processing the HTTP upgrade request for the purposes of establishing a WebSocket connection'
-        }
+          title: "WebSocket request path not available",
+          detail:
+            "A request URL path was not available when processing the HTTP upgrade request for the purposes of establishing a WebSocket connection",
+        },
       ],
-      errorOriginator: 'unsure'
-    }
-  }
+      errorOriginator: "unsure",
+    },
+  };
   sendMessage(ws, error);
 }
 
