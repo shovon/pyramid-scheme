@@ -11,6 +11,6 @@
   },
   "scripts": {
     "build": "tsc",
-    "test": "npm run build && node build/test.js"
+    "test": "ts-node --files 'src/*.ts' src/test.ts"
   }
 }

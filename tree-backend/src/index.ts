@@ -1,15 +1,16 @@
 import WebSocket, { WebSocketServer } from "ws";
 import { Patterns } from "./path-matcher";
-import {
-  // sendBadURLPathError,
-  sendNodeIdInUseError,
-} from "./messsages/server-message";
 import Tree from "./Tree";
 import { IncomingMessage } from "http";
 import { strict as assert } from "assert";
 import Node from "./Node";
 import RootNodeManager from "./root-node";
-import { sendBadURLPathError } from "./messsages/server-errors";
+import {
+  sendBadURLPathError,
+  sendNodeIdInUseError,
+  sendNoURLProvidedError,
+} from "./messsages/server-errors";
+import { logger } from "./logger";
 
 function parseNumber(value: string): number | null {
   const result = parseInt(value);
@@ -18,6 +19,7 @@ function parseNumber(value: string): number | null {
 
 const port = parseNumber(process.env.PORT || "") || 3030;
 
+logger.info({ port }, `About to start server at port ${port}`);
 const wss = new WebSocketServer({ port });
 
 type NodeValue = {
@@ -52,17 +54,22 @@ type PatternValue = {
 
 const patterns = new Patterns<PatternValue>();
 
-patterns.register("/trees/:treeId/view", ({ params, value: { ws } }) => {
-  const treeId = params.get("treeId");
-  assert(typeof treeId === "string");
+patterns.register(
+  "/trees/:treeId/view/:nodeId",
+  ({ params, value: { ws } }) => {
+    const treeId = params.get("treeId");
+    const nodeId = params.get("nodeId");
+    assert(typeof treeId === "string");
+    assert(typeof nodeId === "string");
 
-  const tree = getTree(treeId);
+    const tree = getTree(treeId);
 
-  tree.insertNode(new Node(nodeId, { socket: ws, state: {} }));
-  ws.on("close", () => {
-    tree.removeValueByKey(nodeId);
-  });
-});
+    tree.insertNode(new Node(nodeId, { socket: ws, state: {} }));
+    ws.on("close", () => {
+      tree.removeValueByKey(nodeId);
+    });
+  }
+);
 patterns.register(
   "/trees/:treeId/view/structure-only",
   ({ params, value: { ws } }) => {
@@ -88,7 +95,7 @@ patterns.register("/trees/:treeId/broadcast", ({ params, value: { ws } }) => {
   const tree = getTree(treeId);
 
   if (tree.has(treeId)) {
-    sendNodeIdInUseError(ws);
+    sendNodeIdInUseError(ws, treeId);
     if (tree.isEmpty) {
       removeTree(treeId);
     }
@@ -106,8 +113,9 @@ wss.on("connection", (ws, request) => {
     patterns.dispatch(request.url, { ws, request });
   } else {
     if (typeof request.url !== "string") {
-      sendBadURLPathError(ws, request.url);
+      sendNoURLProvidedError(ws);
     } else {
+      sendBadURLPathError(ws, request.url);
     }
     ws.close();
   }

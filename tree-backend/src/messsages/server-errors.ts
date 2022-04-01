@@ -309,9 +309,40 @@ export function sendBadKeyError(
           },
         },
       ],
-      errorOriginator: "client",
+      errorOriginator: originator,
     },
   };
+  sendMessage(ws, error);
+}
+
+export type NoPathAvailable = {
+  error: {
+    type: "NO_PATH_AVAILABLE",
+    errors: [
+      {
+        title: 'WebSocket request path not available',
+        detail: 'A request URL path was not available when processing the HTTP upgrade request for the purposes of establishing a WebSocket connection'
+      }
+    ],
+    errorOriginator: 'unsure'
+  }
+}
+
+export function sendNoURLProvidedError(
+  ws: WebSocket,
+) {
+  const error: NoPathAvailable = {
+    error: {
+      type: 'NO_PATH_AVAILABLE',
+      errors: [
+        {
+          title: 'WebSocket request path not available',
+          detail: 'A request URL path was not available when processing the HTTP upgrade request for the purposes of establishing a WebSocket connection'
+        }
+      ],
+      errorOriginator: 'unsure'
+    }
+  }
   sendMessage(ws, error);
 }
 
@@ -323,4 +354,5 @@ export type ErrorResponse =
   | FatalError
   | StillProcessingNodeIdError
   | NodeIdInUseError
-  | BadKeyError;
+  | BadKeyError
+  | NoPathAvailable;

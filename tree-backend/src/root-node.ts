@@ -31,12 +31,23 @@ export type NodeState =
       type: "VALIDATED";
     };
 
+// You can think of this as a state machine
 export default class RootNodeManager {
+  // The initial state is going to represent that that the manager is reparing
+  // the challenge
   private nodeState: NodeState = { type: "PREPARING_CHALLENGE" };
+
+  // This is the challenge that is going to be used for determining whether the
+  // new node is legitimate
   private challenge: Buffer = crypto.randomBytes(16);
+
+  // The buffer that will serve as the 65-byte NIST-encoded ECDSA P-256 key
   private publicKeyBuffer: Buffer;
+
+  // The WebCrypto's CryptoKey that will represent the ECDSA P-256 key
   private _ecdsaKey: CryptoKey | null = null;
 
+  // Getes a promise, that will contain the CryptoKey
   get ecdsaKey(): Promise<CryptoKey> {
     if (this._ecdsaKey) {
       return Promise.resolve(this._ecdsaKey);
@@ -63,15 +74,21 @@ export default class RootNodeManager {
         },
         "client"
       );
+      // And kill the connection
       ws.close();
       return;
     }
-    this.ecdsaKey
-      .then(() => {
+
+    this.ecdsaKey.then(
+      () => {
+        // Got the ECDSA key.
+        //
+        // Sending challenge.
         this.nodeState = { type: "AWAITING_CHALLENGE_RESPONSE" };
         sendChallenge(ws, this.challenge.toString("base64"));
-      })
-      .catch((e) => {
+      },
+      (e) => {
+        // Notify to the user that the key is malformed
         sendBadKeyError(
           ws,
           {
@@ -81,9 +98,12 @@ export default class RootNodeManager {
           },
           "unsure"
         );
+        // And kill the connection
         ws.close();
-      });
+      }
+    );
 
+    // Handle all messages
     ws.addEventListener("message", (data) => {
       const dataValidation = clientMessageSchema.validate(data);
       if (!dataValidation.isValid) {
@@ -101,11 +121,13 @@ export default class RootNodeManager {
     switch (this.nodeState.type) {
       case "PREPARING_CHALLENGE":
         {
+          // Honestly, we shouldn't be here. So let the client know.
           sendStillProcessingNodeIdError(this.ws);
         }
         break;
       case "AWAITING_CHALLENGE_RESPONSE":
         {
+          // Check the payload
           const payloadValidation = awaitingResponseSchema.validate(
             message.payload
           );
