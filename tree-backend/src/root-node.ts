@@ -63,6 +63,7 @@ export default class RootNodeManager {
         },
         "client"
       );
+      ws.close();
       return;
     }
     this.ecdsaKey

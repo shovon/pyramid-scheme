@@ -94,7 +94,7 @@ patterns.register("/trees/:treeId/broadcast", ({ params, value: { ws } }) => {
     }
   }
 
-  const manager = new RootNodeManager(ws, treeId);
+  new RootNodeManager(ws, treeId);
 
   ws.on("close", () => {
     tree.removeValueByKey(treeId);
