@@ -71,6 +71,47 @@ export default class NodeValidationMachine {
     });
   }
 
+  private badKey() {
+    logger.debug(
+      { publicKey: this.nodeId },
+      "We were not provided with a valid public key as the Node ID; too short"
+    );
+    sendBadKeyError(
+      this.ws,
+      {
+        message: `Expected the tree ID to be a base64-encoded NIST-format 65-byte ECDSA public key, but instead got a key of length ${this.publicKeyBuffer.length}`,
+        key: this.nodeId,
+      },
+      "client"
+    );
+    logger.trace("Closing the connection, because of bad key");
+    this.ws.close();
+  }
+
+  private async checkEcdsaKey() {
+    try {
+      await this.ecdsaKey;
+      // Got the ECDSA key.
+      //
+      // Sending challenge.
+      this.nodeState = { type: "AWAITING_CHALLENGE_RESPONSE" };
+    } catch (e) {
+      sendChallenge(this.ws, this.challenge.toString("base64"));
+      // Notify to the user that the key is malformed
+      sendBadKeyError(
+        this.ws,
+        {
+          message: "An error occurred attempting to parse the key",
+          key: this.nodeId,
+          errorObject: e,
+        },
+        "unsure"
+      );
+      // And kill the connection
+      this.ws.close();
+    }
+  }
+
   constructor(private ws: WebSocket, private nodeId: string) {
     logger.trace("Creating a new validation engine");
 
@@ -80,49 +121,17 @@ export default class NodeValidationMachine {
     // that the ECDSA scheme can understand
 
     this.publicKeyBuffer = Buffer.from(nodeId, "base64");
+
     if (this.publicKeyBuffer.length !== 65) {
-      logger.debug(
-        { publicKey: nodeId },
-        "We were not provided with a valid public key as the Node ID; too short"
-      );
-      sendBadKeyError(
-        ws,
-        {
-          message: `Expected the tree ID to be a base64-encoded NIST-format 65-byte ECDSA public key, but instead got a key of length ${this.publicKeyBuffer.length}`,
-          key: nodeId,
-        },
-        "client"
-      );
-      logger.trace("Closing the connection, because of bad key");
-      ws.close();
+      this.badKey();
       return;
     }
 
     logger.trace("We have a valid public key");
 
-    this.ecdsaKey.then(
-      () => {
-        // Got the ECDSA key.
-        //
-        // Sending challenge.
-        this.nodeState = { type: "AWAITING_CHALLENGE_RESPONSE" };
-        sendChallenge(ws, this.challenge.toString("base64"));
-      },
-      (e) => {
-        // Notify to the user that the key is malformed
-        sendBadKeyError(
-          ws,
-          {
-            message: "An error occurred attempting to parse the key",
-            key: nodeId,
-            errorObject: e,
-          },
-          "unsure"
-        );
-        // And kill the connection
-        ws.close();
-      }
-    );
+    this.checkEcdsaKey().catch((e) => {
+      logger.fatal(e);
+    });
 
     // Handle all messages
     ws.addEventListener("message", (data) => {
@@ -170,6 +179,7 @@ export default class NodeValidationMachine {
         break;
       case "VALIDATED":
         {
+          logger.debug("Not supposed to be here");
         }
         break;
       default:

@@ -63,6 +63,25 @@ export const createSubject = <T>(): Subject<T> => {
   };
 };
 
+export const createReplayLast = <T>(
+  subscribable: Subscribable<T>
+): Subscribable<T> => {
+  type LastType = { type: "NOT_AVAILABLE" } | { type: "AVAILABLE"; value: T };
+
+  let last: LastType = {
+    type: "NOT_AVAILABLE",
+  };
+  return {
+    subscribe: (listener) => {
+      if (last.type === "AVAILABLE") {
+        listener(last.value);
+      }
+      const unsubscribe = subscribable.subscribe(listener);
+      return unsubscribe;
+    },
+  };
+};
+
 export const createSubscribable = <T>(
   fn: (subscriber: Subscriber<T>) => void
 ): Subscribable<T> => {
