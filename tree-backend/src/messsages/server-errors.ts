@@ -287,6 +287,32 @@ export type BadKeyError = {
   };
 };
 
+export function createBadKeyFormat(
+  {
+    message,
+    key,
+    errorObject,
+  }: { message: string; key: string; errorObject?: any },
+  originator: "client" | "unsure"
+): BadKeyError {
+  return {
+    error: {
+      type: "BAD_KEY_FORMAT",
+      errors: [
+        {
+          title: "Tree ID is in an unparsable format",
+          detail: message,
+          meta: {
+            key,
+            errorObject,
+          },
+        },
+      ],
+      errorOriginator: originator,
+    },
+  };
+}
+
 export function sendBadKeyError(
   ws: WebSocket,
   {

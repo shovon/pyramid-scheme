@@ -1,8 +1,9 @@
+import { BadKeyError, createBadKeyFormat } from "./messsages/server-errors";
 import { createReplayLast, createSubject, Subscribable } from "./subscriber";
 
 export type ValidatingState = {
   type: "validating_nodeid";
-  transition: Subscribable<FailedState | ChallengedState>;
+  onTransition: Subscribable<FailedState | ChallengedState>;
 };
 
 export type FailedState = {
@@ -11,7 +12,7 @@ export type FailedState = {
 
 export type ChallengedState = {
   type: "client_challenged";
-  transition: Subscribable<FailedState | DoneState>;
+  onTransition: Subscribable<FailedState | DoneState>;
   handle: (value: unknown) => void;
 };
 
@@ -28,16 +29,26 @@ export function validating(nodeId: string): ValidatingState {
   const transition = createSubject<FailedState | ChallengedState>();
 
   if (nodeId.length !== 65) {
-    transition.emit(failed());
+    transition.emit(
+      failed(
+        createBadKeyFormat(
+          {
+            message: `Expected the tree ID to be a base64-encoded NIST-format 65-byte ECDSA public key, but instead got a key of length ${nodeId.length}`,
+            key: nodeId,
+          },
+          "client"
+        )
+      )
+    );
   }
 
   return {
     type: "validating_nodeid",
-    transition: createReplayLast(transition),
+    onTransition: createReplayLast(transition),
   };
 }
 
-function failed(): FailedState {
+function failed(error: BadKeyError): FailedState {
   return {
     type: "failed",
   };
@@ -48,17 +59,15 @@ function challenged(): ChallengedState {
 
   return {
     type: "client_challenged",
-    transition: createReplayLast(transition),
+    onTransition: createReplayLast(transition),
     handle: (value: unknown) => {
       // TODO: add a handler here
     },
   };
 }
 
-function done() {
+function done(): DoneState {
   return {
-    type: "handshake_done",
-    transition: () => {},
-    handle: () => {},
+    type: "done",
   };
 }
