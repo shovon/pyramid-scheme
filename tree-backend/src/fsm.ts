@@ -10,10 +10,24 @@ import {
   subscribeFor,
 } from "./subscriber";
 
+function once<T>(subscribable: Subscribable<T>): Subscribable<T> {
+  return createReplayLast(subscribeFor(subscribable, 1));
+}
+
+function toPromise<T>(subscribable: Subscribable<T>): Promise<T> {
+  const event = once(subscribable);
+  return new Promise((resolve) => {
+    const unsubscribe = event.subscribe((event) => {
+      unsubscribe();
+      resolve(event);
+    });
+  });
+}
+
 export type ValidatingState = {
   type: "validating_nodeid";
   start: () => void;
-  onTransition: Subscribable<FailedState | ChallengedState>;
+  nextState: Promise<FailedState | ChallengedState>;
 };
 
 export type FailedState = {
@@ -34,8 +48,6 @@ export type DoneState = {
 };
 
 export function validating(nodeId: string): ValidatingState {
-  // This is the initial state
-
   const transition = createSubject<FailedState | ChallengedState>();
 
   return {
@@ -55,7 +67,7 @@ export function validating(nodeId: string): ValidatingState {
         );
       }
     },
-    onTransition: createReplayLast(subscribeFor(transition, 1)),
+    nextState: toPromise(transition),
   };
 }
 
@@ -72,7 +84,7 @@ function challenged(): ChallengedState {
 
   return {
     type: "client_challenged",
-    onTransition: createReplayLast(transition),
+    onTransition: once(transition),
     handle: (value: unknown) => {},
   };
 }
