@@ -1,13 +1,25 @@
-import { BadKeyError, createBadKeyFormat } from "./messsages/server-errors";
-import { createReplayLast, createSubject, Subscribable } from "./subscriber";
+import {
+  BadKeyError,
+  createBadKeyFormat,
+  ErrorResponse,
+} from "./messsages/server-errors";
+import {
+  createReplayLast,
+  createSubject,
+  Subscribable,
+  subscribeFor,
+} from "./subscriber";
 
 export type ValidatingState = {
   type: "validating_nodeid";
+  start: () => void;
   onTransition: Subscribable<FailedState | ChallengedState>;
 };
 
 export type FailedState = {
   type: "failed";
+  error: ErrorResponse;
+  done: true;
 };
 
 export type ChallengedState = {
@@ -18,39 +30,40 @@ export type ChallengedState = {
 
 export type DoneState = {
   type: "done";
+  done: true;
 };
 
 export function validating(nodeId: string): ValidatingState {
-  // This is going to be validating a Node ID.
-  //
-  // Upon validation, a challenge value is going to be available as an input to
-  // the next step
+  // This is the initial state
 
   const transition = createSubject<FailedState | ChallengedState>();
 
-  if (nodeId.length !== 65) {
-    transition.emit(
-      failed(
-        createBadKeyFormat(
-          {
-            message: `Expected the tree ID to be a base64-encoded NIST-format 65-byte ECDSA public key, but instead got a key of length ${nodeId.length}`,
-            key: nodeId,
-          },
-          "client"
-        )
-      )
-    );
-  }
-
   return {
     type: "validating_nodeid",
-    onTransition: createReplayLast(transition),
+    start: () => {
+      if (nodeId.length !== 65) {
+        transition.emit(
+          failed(
+            createBadKeyFormat(
+              {
+                message: `Expected the tree ID to be a base64-encoded NIST-format 65-byte ECDSA public key, but instead got a key of length ${nodeId.length}`,
+                key: nodeId,
+              },
+              "client"
+            )
+          )
+        );
+      }
+    },
+    onTransition: createReplayLast(subscribeFor(transition, 1)),
   };
 }
 
 function failed(error: BadKeyError): FailedState {
   return {
     type: "failed",
+    done: true,
+    error,
   };
 }
 
@@ -60,14 +73,13 @@ function challenged(): ChallengedState {
   return {
     type: "client_challenged",
     onTransition: createReplayLast(transition),
-    handle: (value: unknown) => {
-      // TODO: add a handler here
-    },
+    handle: (value: unknown) => {},
   };
 }
 
 function done(): DoneState {
   return {
     type: "done",
+    done: true,
   };
 }

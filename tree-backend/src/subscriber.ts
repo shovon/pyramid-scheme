@@ -63,6 +63,27 @@ export const createSubject = <T>(): Subject<T> => {
   };
 };
 
+export const subscribeFor = <T>(
+  subscribable: Subscribable<T>,
+  count: number
+): Subscribable<T> => {
+  let currentCount = 0;
+  const subject = createSubject<T>();
+  return {
+    subscribe: (listener) => {
+      const unsubscribe = subscribable.subscribe((event) => {
+        if (currentCount < count) {
+          subject.emit(event);
+        } else {
+          unsubscribe();
+        }
+        currentCount++;
+      });
+      return subject.subscribe(listener);
+    },
+  };
+};
+
 export const createReplayLast = <T>(
   subscribable: Subscribable<T>
 ): Subscribable<T> => {
@@ -76,7 +97,10 @@ export const createReplayLast = <T>(
       if (last.type === "AVAILABLE") {
         listener(last.value);
       }
-      const unsubscribe = subscribable.subscribe(listener);
+      const unsubscribe = subscribable.subscribe((event) => {
+        last = { type: "AVAILABLE", value: event };
+        listener(event);
+      });
       return unsubscribe;
     },
   };
