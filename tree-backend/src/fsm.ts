@@ -1,3 +1,4 @@
+import { importRawNistEcPublicKey } from "./es256";
 import {
   BadKeyError,
   createBadKeyFormat,
@@ -33,7 +34,6 @@ export type ValidatingState = {
 export type FailedState = {
   type: "failed";
   error: ErrorResponse;
-  done: true;
 };
 
 export type ChallengedState = {
@@ -44,7 +44,6 @@ export type ChallengedState = {
 
 export type DoneState = {
   type: "done";
-  done: true;
 };
 
 export function validating(nodeId: string): ValidatingState {
@@ -53,12 +52,17 @@ export function validating(nodeId: string): ValidatingState {
   return {
     type: "validating_nodeid",
     start: () => {
+      const publicKeyBuffer = Buffer.from(nodeId, "base64");
+
       if (nodeId.length !== 65) {
-        transition.emit(
+        return transition.emit(
           failed(
             createBadKeyFormat(
               {
-                message: `Expected the tree ID to be a base64-encoded NIST-format 65-byte ECDSA public key, but instead got a key of length ${nodeId.length}`,
+                message:
+                  `Expected the tree ID to be a base64-encoded ` +
+                  `NIST-format 65-byte ECDSA public key, but instead got a ` +
+                  `key of length ${nodeId.length}`,
                 key: nodeId,
               },
               "client"
@@ -66,6 +70,26 @@ export function validating(nodeId: string): ValidatingState {
           )
         );
       }
+
+      importRawNistEcPublicKey(publicKeyBuffer).then(
+        (key) => {
+          transition.emit(challenged(key));
+        },
+        (e) => {
+          transition.emit(
+            failed(
+              createBadKeyFormat(
+                {
+                  message: "An error occurred attempting to parse the key",
+                  key: nodeId,
+                  errorObject: e,
+                },
+                "unsure"
+              )
+            )
+          );
+        }
+      );
     },
     nextState: toPromise(transition),
   };
@@ -74,12 +98,11 @@ export function validating(nodeId: string): ValidatingState {
 function failed(error: BadKeyError): FailedState {
   return {
     type: "failed",
-    done: true,
     error,
   };
 }
 
-function challenged(): ChallengedState {
+function challenged(key: CryptoKey): ChallengedState {
   const transition = createSubject<DoneState>();
 
   return {
@@ -92,6 +115,5 @@ function challenged(): ChallengedState {
 function done(): DoneState {
   return {
     type: "done",
-    done: true,
   };
 }
